@@ -1593,6 +1593,15 @@ static void rebuild_all(void) {
     Rwidget_add_child(g_app.root, sidebar);
     build_sidebar(sidebar);
 
+    /* a one-pixel line between the menu and the content, like the card outlines */
+    Rid separator = Rwidget_create(R_WIDGET_BORDER);
+    Rwidget_set_size(separator, 1.0f, 0.0f);
+    float br, bg, bb, ba;
+    Rtheme_get_color(R_COLOR_BORDER, &br, &bg, &bb, &ba);
+    Rborder_set_background(separator, br, bg, bb, 1.0f);
+    Rslot_set_auto(separator);
+    Rwidget_add_child(g_app.root, separator);
+
     g_app.content = ui_vbox(14.0f);
     Rslot_set_fill(g_app.content, 1.0f);
     Rslot_set_padding(g_app.content, 26.0f, 22.0f, 26.0f, 20.0f);
