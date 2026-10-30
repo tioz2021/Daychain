@@ -287,6 +287,9 @@ static Rid nav_button(const char *text, Screen screen, int index) {
     Rborder_set_padding(bg, 10.0f, 3.0f, 10.0f, 3.0f);
     Rborder_set_background(bg, 0.0f, 0.0f, 0.0f, 0.0f);
     Rid button = ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
+    /* The pill behind the entry is the highlight; a focus ring on the button
+       would draw a second rectangle inside it. */
+    Rwidget_set_focusable(button, R_FALSE);
     Rwidget_add_child(bg, button);
     g_app.nav_bg[index] = bg;
     return bg;
