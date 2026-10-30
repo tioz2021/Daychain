@@ -1,5 +1,5 @@
 /*
- * habits-desktop — native client built on Raven.
+ * habits — native client built on Raven.
  *
  * Reuses the same core and JSONL storage as the web build: no HTTP server,
  * no browser. Run with --data <dir> (default: <exe dir>/data).
@@ -23,7 +23,7 @@
 #include "core/store.h"
 #include "infra/util.h"
 
-#define APP_VERSION "1.1.0"
+#define APP_VERSION "2.0.0"
 
 typedef enum {
     SCREEN_TODAY = 0,
@@ -269,6 +269,7 @@ static int habit_cmp(const void *a, const void *b) {
 }
 
 static void on_toggle_done(Rid button, void *ud);
+static void on_note(Rid button, void *ud);
 static void on_toggle_skip(Rid button, void *ud);
 
 static void on_prev_day(Rid b, void *ud) {
@@ -323,6 +324,8 @@ static Rid habit_row(const Habit *h) {
 
     int is_done = entry && entry->status == ENTRY_DONE;
     int is_skipped = entry && entry->status == ENTRY_SKIPPED;
+
+    add_center(col, ui_button("Note", on_note, (void *)(intptr_t)h->id));
 
     Rid done_btn = ui_button(is_done ? "Done ✓" : "Done", on_toggle_done, (void *)(intptr_t)h->id);
     if (is_done) Rbutton_set_style(done_btn, R_BUTTON_PRIMARY);
@@ -428,12 +431,7 @@ static void on_quit_reset(Rid button, void *ud) {
                      "The current attempt will be counted in your best result.",
                      R_MESSAGE_OK_CANCEL) != R_MESSAGE_RESULT_OK)
         return;
-    int64_t now = now_epoch();
-    int64_t elapsed = now - q->started_at;
-    if (elapsed > q->best_seconds) q->best_seconds = elapsed;
-    q->attempts++;
-    q->started_at = now;
-    iso_from_epoch(now, q->started_iso);
+    quit_reset(q, now_epoch());
     save_db();
     rebuild();
 }
@@ -518,6 +516,63 @@ static void dialog_closed(Rid content, int result, void *ud) {
     (void)result;
     free(ud);
     rebuild();
+}
+
+
+typedef struct {
+    Rid text;
+    int64_t habit_id;
+    int32_t day;
+} NoteForm;
+
+static void note_save(Rid button, void *ud) {
+    NoteForm *f = ud;
+    const char *note = Rtext_input_get_text(f->text);
+    const Entry *e = db_entry_find_c(&g_app.db, f->habit_id, f->day);
+    if (!e && (!note || !*note)) {
+        Rdialog_close(button, 0);
+        return;
+    }
+    char now[32];
+    now_iso8601(now);
+    db_entry_upsert(&g_app.db, f->habit_id, f->day, e ? e->status : ENTRY_DONE, note, now);
+    save_db();
+    Rdialog_close(button, 1);
+}
+
+static void open_note_form(int64_t habit_id) {
+    const Entry *e = db_entry_find_c(&g_app.db, habit_id, g_app.date);
+    NoteForm *f = xmalloc(sizeof *f);
+    f->habit_id = habit_id;
+    f->day = g_app.date;
+
+    Rid form = ui_vbox(8.0f);
+    Rwidget_set_min_size(form, 420.0f, 0.0f);
+    Rwidget_add_child(form, ui_label("Note", 18.0f, 1));
+    f->text = Rwidget_create(R_WIDGET_TEXT_INPUT);
+    Rtext_input_set_placeholder(f->text, "How did it go?");
+    Rtext_input_set_max_length(f->text, 500);
+    if (e) Rtext_input_set_text(f->text, e->note);
+    Rwidget_add_child(form, f->text);
+
+    Rid buttons = ui_hbox(8.0f);
+    Rwidget_add_child(buttons, ui_spacer());
+    Rwidget_add_child(buttons, ui_button("Cancel", on_dialog_cancel, NULL));
+    Rid save = ui_button("Save", note_save, f);
+    Rbutton_set_style(save, R_BUTTON_PRIMARY);
+    Rwidget_add_child(buttons, save);
+    Rwidget_add_child(form, buttons);
+
+    Rid wrap = Rwidget_create(R_WIDGET_BORDER);
+    Rborder_set_padding(wrap, 18.0f, 16.0f, 18.0f, 16.0f);
+    Rborder_set_background(wrap, 0.0f, 0.0f, 0.0f, 0.0f);
+    Rwidget_add_child(wrap, form);
+    Rdialog_open(g_app.window, wrap, dialog_closed, f);
+}
+
+static void on_note(Rid button, void *ud) {
+    (void)button;
+    open_note_form((int64_t)(intptr_t)ud);
 }
 
 typedef struct {
@@ -1041,7 +1096,7 @@ static void build_settings(Rid root) {
     Rwidget_add_child(col, ui_label("Data", 13.0f, 1));
     Rwidget_add_child(col, ui_muted(g_app.data_dir, 13.0f));
     Rwidget_add_child(col, ui_label("Version", 13.0f, 1));
-    Rwidget_add_child(col, ui_muted("habits-desktop " APP_VERSION, 13.0f));
+    Rwidget_add_child(col, ui_muted("habits " APP_VERSION, 13.0f));
     Rid export_row = ui_hbox(8.0f);
     Rwidget_add_child(export_row, ui_button("Export data", on_export, NULL));
     Rwidget_add_child(col, export_row);
@@ -1104,8 +1159,8 @@ static void on_error(RError code, RSeverity severity, const char *detail) {
 }
 
 static void usage(void) {
-    printf("habits-desktop %s — native client\n"
-           "Usage: habits-desktop [--data <dir>]\n"
+    printf("habits %s — native client\n"
+           "Usage: habits [--data <dir>]\n"
            "Screenshot mode: HABITS_FRAMES=<n> HABITS_SHOT=<out.ppm>\n",
            APP_VERSION);
 }
@@ -1160,7 +1215,7 @@ int main(int argc, char **argv) {
             usage();
             return 0;
         } else if (strcmp(argv[i], "--version") == 0) {
-            printf("habits-desktop %s\n", APP_VERSION);
+            printf("habits %s\n", APP_VERSION);
             return 0;
         } else if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
@@ -1188,7 +1243,7 @@ int main(int argc, char **argv) {
 
     char err[512] = "";
     if (!store_load(&g_app.db, g_app.data_dir, err, sizeof err)) {
-        fprintf(stderr, "habits-desktop: %s\n", err);
+        fprintf(stderr, "habits: %s\n", err);
         return 1;
     }
     if (!screen_given) g_app.screen = SCREEN_TODAY;
@@ -1196,7 +1251,7 @@ int main(int argc, char **argv) {
 
     Rerror_set_callback(on_error);
     if (!Rinit(R_BACKEND_VULKAN)) {
-        fprintf(stderr, "habits-desktop: cannot start Raven (Vulkan driver?)\n");
+        fprintf(stderr, "habits: cannot start Raven (Vulkan driver?)\n");
         return 1;
     }
     Rtheme_apply(R_THEME_DARK);

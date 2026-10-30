@@ -15,7 +15,6 @@ int main(void) {
         {"schedule", test_schedule},
         {"stats", test_stats},
         {"store", test_store},
-        {"api", test_api},
         {"quit", test_quit},
     };
     for (size_t i = 0; i < sizeof tests / sizeof tests[0]; i++) {

@@ -111,6 +111,8 @@ const Quit *db_quit_by_id_c(const DB *db, int64_t id);
 Quit *db_quit_add(DB *db);
 void db_quit_remove(DB *db, int64_t id);
 bool quit_validate(const Quit *q, int64_t now, const char **code, const char **message);
+/* Start a new attempt at `at`, counting the elapsed time into the best result. */
+bool quit_reset(Quit *q, int64_t at);
 
 const char *sched_kind_name(SchedKind k);
 bool sched_kind_parse(const char *s, SchedKind *out);

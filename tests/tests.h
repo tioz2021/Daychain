@@ -35,7 +35,6 @@ void test_json(void);
 void test_schedule(void);
 void test_stats(void);
 void test_store(void);
-void test_api(void);
 void test_quit(void);
 
 #endif

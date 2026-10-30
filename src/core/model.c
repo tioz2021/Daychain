@@ -353,6 +353,16 @@ bool quit_validate(const Quit *q, int64_t now, const char **code, const char **m
     return true;
 }
 
+bool quit_reset(Quit *q, int64_t at) {
+    if (!q || at <= q->started_at) return false;
+    int64_t elapsed = at - q->started_at;
+    if (elapsed > q->best_seconds) q->best_seconds = elapsed;
+    q->attempts++;
+    q->started_at = at;
+    iso_from_epoch(at, q->started_iso);
+    return true;
+}
+
 bool entry_validate(int32_t day, int status, const char *note, int32_t habit_start,
                     int32_t today, const char **code, const char **message) {
     if (day > today) {
