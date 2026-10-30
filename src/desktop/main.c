@@ -41,6 +41,7 @@ typedef struct {
     Rid window;
     Rid content;
     Rid nav[SCREEN_COUNT];
+    Rid nav_bg[SCREEN_COUNT];
 
     Screen screen;
     int32_t date;
@@ -206,6 +207,34 @@ static Rid ui_card(Rid *content) {
     return border;
 }
 
+/* A card with a coloured strip on the left, in the habit's colour. */
+static Rid ui_card_acc(const char *hex, Rid *content) {
+    float r, g, b;
+    hex_to_rgb(hex, &r, &g, &b);
+    float pr, pg, pb, pa;
+    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
+
+    Rid outer = Rwidget_create(R_WIDGET_BORDER);
+    Rborder_set_background(outer, pr, pg, pb, 1.0f);
+    Rborder_set_corner_radius(outer, 12.0f, 12.0f, 12.0f, 12.0f);
+
+    Rid row = ui_hbox(0.0f);
+    Rwidget_add_child(outer, row);
+
+    Rid strip = Rwidget_create(R_WIDGET_BORDER);
+    Rwidget_set_size(strip, 4.0f, 0.0f);
+    Rborder_set_background(strip, r, g, b, 1.0f);
+    Rborder_set_corner_radius(strip, 12.0f, 0.0f, 0.0f, 12.0f);
+    Rwidget_add_child(row, strip);
+
+    Rid inner = ui_hbox(12.0f);
+    Rslot_set_padding(inner, 14.0f, 12.0f, 14.0f, 12.0f);
+    Rslot_set_fill(inner, 1.0f);
+    Rwidget_add_child(row, inner);
+    *content = inner;
+    return outer;
+}
+
 static Rid ui_icon_badge(const char *glyph, const char *hex) {
     float r, g, b;
     hex_to_rgb(hex, &r, &g, &b);
@@ -252,8 +281,15 @@ static void on_nav(Rid button, void *ud) {
     rebuild();
 }
 
-static Rid nav_button(const char *text, Screen screen) {
-    return ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
+static Rid nav_button(const char *text, Screen screen, int index) {
+    Rid bg = Rwidget_create(R_WIDGET_BORDER);
+    Rborder_set_corner_radius(bg, 9.0f, 9.0f, 9.0f, 9.0f);
+    Rborder_set_padding(bg, 10.0f, 3.0f, 10.0f, 3.0f);
+    Rborder_set_background(bg, 0.0f, 0.0f, 0.0f, 0.0f);
+    Rid button = ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
+    Rwidget_add_child(bg, button);
+    g_app.nav_bg[index] = bg;
+    return bg;
 }
 
 /* ---------- today screen ---------- */
@@ -328,12 +364,23 @@ static Rid habit_row(const Habit *h) {
         snprintf(meta, sizeof meta, "%d/%d this week", done, quota);
 
     Rid col;
-    Rid card = ui_card(&col);
+    Rid card = ui_card_acc(h->color, &col);
     add_center(col, ui_icon_badge(icon_glyph(h->icon), h->color));
 
-    Rid text = ui_vbox(2.0f);
+    Rid text = ui_vbox(3.0f);
     Rwidget_add_child(text, ui_label(h->name, 16.0f, 1));
     Rwidget_add_child(text, ui_muted(meta, 12.0f));
+    if (quota > 0) {
+        Rid bar = Rwidget_create(R_WIDGET_PROGRESSBAR);
+        Rwidget_set_size(bar, 130.0f, 4.0f);
+        float value = (float)done / (float)quota;
+        Rprogress_bar_set_value(bar, value > 1.0f ? 1.0f : value);
+        float hr, hg, hb;
+        hex_to_rgb(h->color, &hr, &hg, &hb);
+        Rwidget_set_color(bar, R_COLOR_ACCENT, hr, hg, hb, 1.0f);
+        Rslot_set_valign(bar, R_VALIGN_CENTER);
+        Rwidget_add_child(text, bar);
+    }
     add_center(col, text);
     Rwidget_add_child(col, ui_spacer());
 
@@ -417,7 +464,10 @@ static void build_today(Rid root) {
     Rwidget_add_child(scroll, list);
 
     if (n == 0) {
-        Rwidget_add_child(list, ui_muted("Nothing planned for this day.", 14.0f));
+        Rid empty = ui_vbox(8.0f);
+        Rwidget_add_child(empty, ui_muted("Nothing planned for this day.", 14.0f));
+        Rwidget_add_child(empty, ui_button("New habit", on_new_habit, NULL));
+        Rwidget_add_child(list, empty);
     }
     for (size_t i = 0; i < n; i++) Rwidget_add_child(list, habit_row(items[i]));
     free(items);
@@ -470,7 +520,7 @@ static void build_quitting(Rid root) {
         if (q->archived) continue;
 
         Rid content;
-        Rid card = ui_card(&content);
+        Rid card = ui_card_acc(q->color, &content);
         add_center(content, ui_icon_badge(icon_glyph(q->icon), q->color));
 
         Rid col = ui_vbox(2.0f);
@@ -952,7 +1002,7 @@ static void build_habits(Rid root) {
         if (h->archived) continue;
         any = 1;
         Rid content;
-        Rid card = ui_card(&content);
+        Rid card = ui_card_acc(h->color, &content);
         add_center(content, ui_icon_badge(icon_glyph(h->icon), h->color));
         Rid col = ui_vbox(2.0f);
         Rwidget_add_child(col, ui_label(h->name, 15.0f, 1));
@@ -964,6 +1014,7 @@ static void build_habits(Rid root) {
         Rid edit = ui_button("Edit", on_edit_habit, (void *)(intptr_t)h->id);
         Rid arch = ui_button("Archive", on_archive_habit, (void *)(intptr_t)h->id);
         Rid del = ui_button("Delete", on_delete_habit, (void *)(intptr_t)h->id);
+        Rwidget_set_color(del, R_COLOR_TEXT, 0.94f, 0.38f, 0.38f, 1.0f);
         add_center(content, edit);
         add_center(content, arch);
         add_center(content, del);
@@ -980,7 +1031,7 @@ static void build_habits(Rid root) {
             const Habit *h = &g_app.db.habits[i];
             if (!h->archived) continue;
             Rid content;
-            Rid card = ui_card(&content);
+            Rid card = ui_card_acc(h->color, &content);
             add_center(content, ui_icon_badge(icon_glyph(h->icon), h->color));
             Rid col = ui_vbox(2.0f);
             Rwidget_add_child(col, ui_label(h->name, 15.0f, 1));
@@ -1039,16 +1090,18 @@ static void on_stats_period(Rid combo, int index, void *ud) {
     rebuild();
 }
 
-static Rid stat_card(const char *value, const char *label) {
-    float r, g, b, a;
-    Rtheme_get_color(R_COLOR_PANEL, &r, &g, &b, &a);
+static Rid stat_card(const char *value, const char *label, float vr, float vg, float vb) {
+    float pr, pg, pb, pa;
+    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
     Rid border = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_padding(border, 16.0f, 12.0f, 16.0f, 12.0f);
-    Rborder_set_background(border, r, g, b, 1.0f);
+    Rborder_set_background(border, pr, pg, pb, 1.0f);
     Rborder_set_corner_radius(border, 12.0f, 12.0f, 12.0f, 12.0f);
     Rid col = ui_vbox(2.0f);
     Rwidget_add_child(border, col);
-    Rwidget_add_child(col, ui_label(value, 26.0f, 1));
+    Rid big = ui_label(value, 26.0f, 1);
+    Rlabel_set_color(big, vr, vg, vb, 1.0f);
+    Rwidget_add_child(col, big);
     Rwidget_add_child(col, ui_muted(label, 12.0f));
     Rslot_set_fill(border, 1.0f);
     return border;
@@ -1117,9 +1170,9 @@ static void build_stats(Rid root) {
         snprintf(buf3, sizeof buf3, "—");
 
     Rid cards = ui_hbox(10.0f);
-    Rwidget_add_child(cards, stat_card(buf, "Current streak"));
-    Rwidget_add_child(cards, stat_card(buf2, "Best streak"));
-    Rwidget_add_child(cards, stat_card(buf3, "Completion"));
+    Rwidget_add_child(cards, stat_card(buf, "Current streak", 0.31f, 0.55f, 1.0f));
+    Rwidget_add_child(cards, stat_card(buf2, "Best streak", 0.22f, 0.78f, 0.45f));
+    Rwidget_add_child(cards, stat_card(buf3, "Completion", 0.66f, 0.42f, 0.95f));
     Rwidget_add_child(root, cards);
 
     Rid heat = Rwidget_create(R_WIDGET_CUSTOM);
@@ -1132,8 +1185,39 @@ static void build_stats(Rid root) {
     Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
     Rborder_set_background(heat_wrap, pr, pg, pb, 1.0f);
     Rborder_set_corner_radius(heat_wrap, 12.0f, 12.0f, 12.0f, 12.0f);
-    Rwidget_add_child(heat_wrap, heat);
+    Rid hm_row = ui_hbox(6.0f);
+    Rid days_col = ui_vbox(3.0f);
+    static const char *day_labels[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+    for (int i = 0; i < 7; i++) {
+        Rid d = ui_muted(day_labels[i], 9.0f);
+        Rwidget_set_size(d, 26.0f, 16.0f);
+        Rwidget_add_child(days_col, d);
+    }
+    Rslot_set_valign(days_col, R_VALIGN_TOP);
+    Rwidget_add_child(hm_row, days_col);
+    Rslot_set_valign(heat, R_VALIGN_TOP);
+    Rwidget_add_child(hm_row, heat);
+    Rwidget_add_child(heat_wrap, hm_row);
     Rwidget_add_child(root, heat_wrap);
+
+    Rid legend = ui_hbox(14.0f);
+    struct { float r, g, b; const char *label; } entries[] = {
+        {0.31f, 0.55f, 1.0f, "done"},
+        {0.96f, 0.62f, 0.04f, "skipped"},
+        {0.90f, 0.30f, 0.30f, "missed"},
+    };
+    for (int i = 0; i < 3; i++) {
+        Rid item = ui_hbox(4.0f);
+        Rid sw = Rwidget_create(R_WIDGET_BORDER);
+        Rwidget_set_size(sw, 10.0f, 10.0f);
+        Rborder_set_background(sw, entries[i].r, entries[i].g, entries[i].b, 0.66f);
+        Rborder_set_corner_radius(sw, 3.0f, 3.0f, 3.0f, 3.0f);
+        Rslot_set_valign(sw, R_VALIGN_CENTER);
+        Rwidget_add_child(item, sw);
+        Rwidget_add_child(item, ui_muted(entries[i].label, 11.0f));
+        Rwidget_add_child(legend, item);
+    }
+    Rwidget_add_child(root, legend);
 }
 
 static void on_export(Rid button, void *ud) {
@@ -1165,36 +1249,50 @@ static void on_export(Rid button, void *ud) {
     show_message(ok ? "Export" : "Export failed", msg);
 }
 
+static void settings_section(Rid col, const char *title) {
+    Rid label = ui_muted(title, 11.0f);
+    Rslot_set_padding(label, 0.0f, 12.0f, 0.0f, 0.0f);
+    Rwidget_add_child(col, label);
+}
+
+static Rid setting_row(Rid col, const char *title, const char *value) {
+    Rid row = ui_hbox(8.0f);
+    Rwidget_add_child(row, ui_label(title, 13.0f, 0));
+    Rwidget_add_child(row, ui_spacer());
+    if (value && *value) Rwidget_add_child(row, ui_muted(value, 12.0f));
+    Rwidget_add_child(col, row);
+    return row;
+}
+
 static void build_settings(Rid root) {
     Rwidget_add_child(root, ui_label("Settings", 26.0f, 1));
 
     Rid content;
     Rid card = ui_card(&content);
-    Rid col = ui_vbox(10.0f);
+    Rid col = ui_vbox(6.0f);
     add_center(content, col);
-    Rwidget_add_child(col, ui_label("Data", 13.0f, 1));
-    Rwidget_add_child(col, ui_muted(g_app.data_dir, 13.0f));
-    Rwidget_add_child(col, ui_label("Version", 13.0f, 1));
-    Rwidget_add_child(col, ui_muted("habits " APP_VERSION, 13.0f));
-    Rwidget_add_child(col, ui_label("Theme", 13.0f, 1));
-    Rid theme_row = ui_hbox(8.0f);
-    Rwidget_add_child(theme_row, ui_muted(g_app.light ? "Light" : "Dark", 13.0f));
-    Rwidget_add_child(theme_row,
-                      ui_button(g_app.light ? "Use dark theme" : "Use light theme",
-                                on_toggle_theme, NULL));
-    Rwidget_add_child(col, theme_row);
 
-    Rwidget_add_child(col, ui_label("Animations", 13.0f, 1));
-    Rid anim_row = ui_hbox(8.0f);
-    Rwidget_add_child(anim_row, ui_muted(g_app.animations ? "On" : "Off", 13.0f));
+    settings_section(col, "APPEARANCE");
+    Rid theme_row = setting_row(col, "Theme", g_app.light ? "Light" : "Dark");
+    Rwidget_add_child(theme_row,
+                      ui_button(g_app.light ? "Use dark" : "Use light", on_toggle_theme, NULL));
+
+    Rid anim_row = setting_row(col, "Animations", g_app.animations ? "On" : "Off");
     Rwidget_add_child(anim_row,
-                      ui_button(g_app.animations ? "Turn off animations" : "Turn on animations",
-                                on_toggle_animations, NULL));
-    Rwidget_add_child(col, anim_row);
-    Rid export_row = ui_hbox(8.0f);
+                      ui_button(g_app.animations ? "Turn off" : "Turn on", on_toggle_animations,
+                                NULL));
+
+    settings_section(col, "DATA");
+    Rid path = ui_muted(g_app.data_dir, 12.0f);
+    Rlabel_set_wrap(path, R_TRUE);
+    Rwidget_add_child(col, path);
+    Rid export_row = ui_hbox(0.0f);
     Rwidget_add_child(export_row, ui_button("Export data", on_export, NULL));
     Rwidget_add_child(col, export_row);
-    Rwidget_add_child(col, ui_label("About", 13.0f, 1));
+
+    settings_section(col, "ABOUT");
+    Rid version_row = setting_row(col, "Version", "habits " APP_VERSION);
+    (void)version_row;
     Rwidget_add_child(col,
                       ui_muted("A native client on Raven. The data is a plain JSONL "
                                "file: back it up or move it freely.",
@@ -1257,11 +1355,10 @@ static void build_sidebar(Rid sidebar) {
     static const char *names[SCREEN_COUNT] = {"Today", "Habits", "Quitting", "Statistics",
                                               "Settings"};
     for (int i = 0; i < SCREEN_COUNT; i++) {
-        g_app.nav[i] = nav_button(names[i], (Screen)i);
-        if (i == SCREEN_SETTINGS) {
-            Rwidget_add_child(sidebar, ui_spacer());
-        }
-        Rwidget_add_child(sidebar, g_app.nav[i]);
+        if (i == SCREEN_SETTINGS) Rwidget_add_child(sidebar, ui_spacer());
+        Rid row = nav_button(names[i], (Screen)i, i);
+        g_app.nav[i] = Rwidget_get_child(row, 0);
+        Rwidget_add_child(sidebar, row);
     }
     Rwidget_add_child(sidebar, ui_muted("v" APP_VERSION, 11.0f));
 }
@@ -1269,10 +1366,13 @@ static void build_sidebar(Rid sidebar) {
 static void rebuild(void) {
     for (int i = 0; i < SCREEN_COUNT; i++) {
         if (!g_app.nav[i]) continue;
-        if (i == (int)g_app.screen)
+        if (i == (int)g_app.screen) {
             Rwidget_set_color(g_app.nav[i], R_COLOR_TEXT, 0.31f, 0.55f, 1.0f, 1.0f);
-        else
+            Rborder_set_background(g_app.nav_bg[i], 0.31f, 0.55f, 1.0f, 0.15f);
+        } else {
             Rwidget_clear_color(g_app.nav[i], R_COLOR_TEXT);
+            Rborder_set_background(g_app.nav_bg[i], 0.0f, 0.0f, 0.0f, 0.0f);
+        }
     }
     Rwidget_clear_children(g_app.content);
     switch (g_app.screen) {
