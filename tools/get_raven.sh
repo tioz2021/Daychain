@@ -13,6 +13,14 @@ if [ ! -d "$SRC" ]; then
     git clone --depth 1 https://github.com/oscar-soirey/Raven.git "$SRC"
 fi
 
+# Raven hardcodes the radius of the dialog surface; keep the interface square.
+if [ -f "$SRC/src/widget/window.c" ]; then
+    sed -i \
+        -e 's/rvn_paint_surface(painter, root, frame, 26\.0f, RVN_SURFACE_POPUP/rvn_paint_surface(painter, root, frame, 0.0f, RVN_SURFACE_POPUP/' \
+        -e 's/rvn_paint_box(painter, frame, 10\.0f, RVN_THEME_COLOR(R_COLOR_POPUP)/rvn_paint_box(painter, frame, 0.0f, RVN_THEME_COLOR(R_COLOR_POPUP)/' \
+        "$SRC/src/widget/window.c"
+fi
+
 echo "configuring $BUILD"
 "$CMAKE" -S "$SRC" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release \
     -DRAVEN_BUILD_EXAMPLES=OFF -DRAVEN_BUILD_TOOLS=OFF -DRAVEN_BUILD_TESTS=OFF
