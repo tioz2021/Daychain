@@ -1584,14 +1584,18 @@ static void rebuild_all(void) {
     Rwidget_clear_children(g_app.root);
     for (int i = 0; i < SCREEN_COUNT; i++) g_app.nav[i] = R_INVALID_ID;
 
-    Rid sidebar = ui_vbox(4.0f);
-    Rwidget_set_size(sidebar, 190.0f, 0.0f);
-    Rslot_set_padding(sidebar, 16.0f, 18.0f, 12.0f, 14.0f);
+    /* The menu sits on its own panel surface, the same colour the cards use. */
+    Rid sidebar_bg = Rwidget_create(R_WIDGET_BORDER);
+    Rwidget_set_size(sidebar_bg, 206.0f, 0.0f);
+    Rborder_set_padding(sidebar_bg, 16.0f, 18.0f, 12.0f, 14.0f);
     float pr, pg, pb, pa;
     Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
-    Rwidget_set_color(sidebar, R_COLOR_PANEL, pr, pg, pb, 1.0f);
-    Rwidget_add_child(g_app.root, sidebar);
+    Rborder_set_background(sidebar_bg, pr, pg, pb, 1.0f);
+    Rborder_set_corner_radius(sidebar_bg, 0.0f, 0.0f, 0.0f, 0.0f);
+    Rid sidebar = ui_vbox(4.0f);
+    Rwidget_add_child(sidebar_bg, sidebar);
     build_sidebar(sidebar);
+    Rwidget_add_child(g_app.root, sidebar_bg);
 
     /* a one-pixel line between the menu and the content, like the card outlines */
     Rid separator = Rwidget_create(R_WIDGET_BORDER);
