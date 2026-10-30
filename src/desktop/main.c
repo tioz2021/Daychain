@@ -174,7 +174,6 @@ static Rid ui_muted(const char *text, float size) {
 static Rid base_button(const char *text, void (*cb)(Rid, void *), void *ud) {
     Rid button = Rbutton_create(text);
     Rbutton_set_style(button, R_BUTTON_DEFAULT);
-    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
     Rwidget_set_color(button, R_COLOR_CONTROL_BORDER, 0.0f, 0.0f, 0.0f, 0.0f);
     if (cb) Rbutton_set_clicked_callback(button, cb, ud);
     return button;
@@ -235,7 +234,6 @@ static Rid pill_button(const char *text, float r, float g, float b, int solid,
                        void (*cb)(Rid, void *), void *ud) {
     Rid button = Rbutton_create(text);
     Rbutton_set_style(button, R_BUTTON_DEFAULT);
-    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
     if (solid) {
         Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 1.0f);
         Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r * 0.92f, g * 0.92f, b * 0.92f, 1.0f);
@@ -278,7 +276,7 @@ static Rid ui_card(Rid *content) {
     Rid border = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_padding(border, 14.0f, 12.0f, 14.0f, 12.0f);
     Rborder_set_background(border, r, g, b, 1.0f);
-    Rborder_set_corner_radius(border, 12.0f, 12.0f, 12.0f, 12.0f);
+    Rborder_set_corner_radius(border, 0.0f, 0.0f, 0.0f, 0.0f);
     Rid box = ui_hbox(12.0f);
     Rwidget_add_child(border, box);
     *content = box;
@@ -294,7 +292,7 @@ static Rid ui_card_acc(const char *hex, Rid *content) {
 
     Rid outer = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_background(outer, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(outer, 12.0f, 12.0f, 12.0f, 12.0f);
+    Rborder_set_corner_radius(outer, 0.0f, 0.0f, 0.0f, 0.0f);
 
     Rid row = ui_hbox(0.0f);
     Rwidget_add_child(outer, row);
@@ -302,7 +300,7 @@ static Rid ui_card_acc(const char *hex, Rid *content) {
     Rid strip = Rwidget_create(R_WIDGET_BORDER);
     Rwidget_set_size(strip, 4.0f, 0.0f);
     Rborder_set_background(strip, r, g, b, 1.0f);
-    Rborder_set_corner_radius(strip, 12.0f, 0.0f, 0.0f, 12.0f);
+    Rborder_set_corner_radius(strip, 0.0f, 0.0f, 0.0f, 0.0f);
     Rwidget_add_child(row, strip);
 
     Rid inner = ui_hbox(12.0f);
@@ -326,7 +324,7 @@ static Rid ui_icon_badge(const char *glyph, const char *hex) {
     Rid badge = Rwidget_create(R_WIDGET_BORDER);
     Rwidget_set_size(badge, 40.0f, 40.0f);
     Rborder_set_background(badge, br, bg, bb, 1.0f);
-    Rborder_set_corner_radius(badge, 10.0f, 10.0f, 10.0f, 10.0f);
+    Rborder_set_corner_radius(badge, 0.0f, 0.0f, 0.0f, 0.0f);
     Rid label = Rlabel_create(glyph);
     Rlabel_set_text_size(label, 19.0f);
     if (g_app.light)
@@ -361,13 +359,12 @@ static void on_nav(Rid button, void *ud) {
 
 static Rid nav_row(const char *text, Screen screen, int index) {
     Rid bg = Rwidget_create(R_WIDGET_BORDER);
-    Rborder_set_corner_radius(bg, 9.0f, 9.0f, 9.0f, 9.0f);
+    Rborder_set_corner_radius(bg, 0.0f, 0.0f, 0.0f, 0.0f);
     Rborder_set_padding(bg, 0.0f, 0.0f, 0.0f, 0.0f);
     Rborder_set_background(bg, 0.0f, 0.0f, 0.0f, 0.0f);
 
     Rid button = ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
     /* The hover fill must have exactly the shape of the pill behind it. */
-    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
     Rwidget_set_focusable(button, R_FALSE);
     Rwidget_add_child(bg, button);
 
@@ -1259,7 +1256,7 @@ static void paint_heatmap(Rid widget, RPainter *painter, float width, float heig
         }
         float x = (float)(i / 7) * (cell + gap);
         float y = (float)(i % 7) * (cell + gap);
-        Rdraw_rect(painter, x, y, cell, cell, 2.0f, r, g, b, a);
+        Rdraw_rect(painter, x, y, cell, cell, 0.0f, r, g, b, a);
     }
 }
 
@@ -1285,7 +1282,7 @@ static Rid stat_card(const char *value, const char *label, float vr, float vg, f
     Rid border = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_padding(border, 16.0f, 12.0f, 16.0f, 12.0f);
     Rborder_set_background(border, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(border, 12.0f, 12.0f, 12.0f, 12.0f);
+    Rborder_set_corner_radius(border, 0.0f, 0.0f, 0.0f, 0.0f);
     Rid col = ui_vbox(2.0f);
     Rwidget_add_child(border, col);
     Rid big = ui_label(value, 26.0f, 1);
@@ -1373,7 +1370,7 @@ static void build_stats(Rid root) {
     float pr, pg, pb, pa;
     Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
     Rborder_set_background(heat_wrap, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(heat_wrap, 12.0f, 12.0f, 12.0f, 12.0f);
+    Rborder_set_corner_radius(heat_wrap, 0.0f, 0.0f, 0.0f, 0.0f);
     Rid hm_row = ui_hbox(6.0f);
     Rid days_col = ui_vbox(3.0f);
     static const char *day_labels[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
@@ -1400,7 +1397,7 @@ static void build_stats(Rid root) {
         Rid sw = Rwidget_create(R_WIDGET_BORDER);
         Rwidget_set_size(sw, 10.0f, 10.0f);
         Rborder_set_background(sw, entries[i].r, entries[i].g, entries[i].b, 0.66f);
-        Rborder_set_corner_radius(sw, 3.0f, 3.0f, 3.0f, 3.0f);
+        Rborder_set_corner_radius(sw, 0.0f, 0.0f, 0.0f, 0.0f);
         Rslot_set_valign(sw, R_VALIGN_CENTER);
         Rwidget_add_child(item, sw);
         Rwidget_add_child(item, ui_muted(entries[i].label, 11.0f));
@@ -1493,6 +1490,9 @@ static void build_settings(Rid root) {
 
 static void apply_appearance(void) {
     Rtheme_apply(g_app.light ? R_THEME_LIGHT : R_THEME_DARK);
+    /* Square everywhere: buttons, fields, menus, popups, cards. */
+    Rtheme_set_metric(R_METRIC_CORNER_RADIUS, 0.0f);
+    Rtheme_set_metric(R_METRIC_POPUP_RADIUS, 0.0f);
     Rset_animations_enabled(g_app.animations);
 }
 
