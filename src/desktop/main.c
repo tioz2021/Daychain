@@ -69,6 +69,8 @@ static Rid ui_hbox(float spacing);
 static Rid ui_label(const char *text, float size, int bold);
 static Rid ui_muted(const char *text, float size);
 static Rid ui_button(const char *text, void (*cb)(Rid, void *), void *ud);
+static Rid ui_primary_button(const char *text, void (*cb)(Rid, void *), void *ud);
+static Rid ui_danger_button(const char *text, void (*cb)(Rid, void *), void *ud);
 static Rid ui_flat_button(const char *text, void (*cb)(Rid, void *), void *ud);
 static Rid ui_spacer(void);
 static void on_new_habit(Rid button, void *ud);
@@ -169,15 +171,91 @@ static Rid ui_muted(const char *text, float size) {
     return label;
 }
 
-static Rid ui_button(const char *text, void (*cb)(Rid, void *), void *ud) {
+static Rid base_button(const char *text, void (*cb)(Rid, void *), void *ud) {
     Rid button = Rbutton_create(text);
+    Rbutton_set_style(button, R_BUTTON_DEFAULT);
+    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_BORDER, 0.0f, 0.0f, 0.0f, 0.0f);
     if (cb) Rbutton_set_clicked_callback(button, cb, ud);
+    return button;
+}
+
+/* Neutral soft button used everywhere by default. */
+static Rid ui_button(const char *text, void (*cb)(Rid, void *), void *ud) {
+    Rid button = base_button(text, cb, ud);
+    float r, g, b, a;
+    Rtheme_get_color(R_COLOR_TEXT, &r, &g, &b, &a);
+    Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 0.07f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r, g, b, 0.13f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, r, g, b, 0.20f);
+    return button;
+}
+
+/* Filled with the accent: the main action of a screen or a dialog. */
+static Rid ui_primary_button(const char *text, void (*cb)(Rid, void *), void *ud) {
+    Rid button = base_button(text, cb, ud);
+    float r, g, b, a;
+    Rtheme_get_color(R_COLOR_ACCENT, &r, &g, &b, &a);
+    Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 1.0f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r * 0.90f, g * 0.90f, b * 0.90f, 1.0f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, r * 0.80f, g * 0.80f, b * 0.80f, 1.0f);
+    Rtheme_get_color(R_COLOR_ACCENT_TEXT, &r, &g, &b, &a);
+    Rwidget_set_color(button, R_COLOR_TEXT, r, g, b, 1.0f);
+    return button;
+}
+
+/* Soft red: destructive actions (delete, clear). */
+static Rid ui_danger_button(const char *text, void (*cb)(Rid, void *), void *ud) {
+    Rid button = base_button(text, cb, ud);
+    const float r = 0.92f, g = 0.32f, b = 0.32f;
+    Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 0.12f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r, g, b, 0.20f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, r, g, b, 0.28f);
+    if (g_app.light)
+        Rwidget_set_color(button, R_COLOR_TEXT, 0.62f, 0.10f, 0.10f, 1.0f);
+    else
+        Rwidget_set_color(button, R_COLOR_TEXT, 1.0f, 0.58f, 0.58f, 1.0f);
     return button;
 }
 
 static Rid ui_flat_button(const char *text, void (*cb)(Rid, void *), void *ud) {
     Rid button = Rbutton_create(text);
     Rbutton_set_style(button, R_BUTTON_FLAT);
+    if (cb) Rbutton_set_clicked_callback(button, cb, ud);
+    return button;
+}
+
+static float clamp01(float v) {
+    return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+}
+
+/* A rounded button tinted with a semantic colour: soft by default, solid when
+   it is the active state (done / skipped). */
+static Rid pill_button(const char *text, float r, float g, float b, int solid,
+                       void (*cb)(Rid, void *), void *ud) {
+    Rid button = Rbutton_create(text);
+    Rbutton_set_style(button, R_BUTTON_DEFAULT);
+    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
+    if (solid) {
+        Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 1.0f);
+        Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r * 0.92f, g * 0.92f, b * 0.92f, 1.0f);
+        Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, r * 0.84f, g * 0.84f, b * 0.84f, 1.0f);
+        float luma = 0.299f * r + 0.587f * g + 0.114f * b;
+        if (luma > 0.62f)
+            Rwidget_set_color(button, R_COLOR_TEXT, 0.10f, 0.09f, 0.06f, 1.0f);
+        else
+            Rwidget_set_color(button, R_COLOR_TEXT, 1.0f, 1.0f, 1.0f, 1.0f);
+    } else {
+        Rwidget_set_color(button, R_COLOR_CONTROL, r, g, b, 0.14f);
+        Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, r, g, b, 0.24f);
+        Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, r, g, b, 0.34f);
+        if (g_app.light)
+            Rwidget_set_color(button, R_COLOR_TEXT, r * 0.68f, g * 0.68f, b * 0.68f, 1.0f);
+        else
+            Rwidget_set_color(button, R_COLOR_TEXT, clamp01(r * 1.15f + 0.20f),
+                              clamp01(g * 1.15f + 0.20f), clamp01(b * 1.15f + 0.20f), 1.0f);
+    }
+    Rwidget_set_color(button, R_COLOR_CONTROL_BORDER, 0.0f, 0.0f, 0.0f, 0.0f);
     if (cb) Rbutton_set_clicked_callback(button, cb, ud);
     return button;
 }
@@ -395,14 +473,11 @@ static Rid habit_row(const Habit *h) {
 
     add_center(col, ui_button("Note", on_note, (void *)(intptr_t)h->id));
 
-    Rid done_btn = ui_button(is_done ? "Done ✓" : "Done", on_toggle_done, (void *)(intptr_t)h->id);
-    if (is_done) Rbutton_set_style(done_btn, R_BUTTON_PRIMARY);
-    add_center(col, done_btn);
+    add_center(col, pill_button(is_done ? "Done ✓" : "Done", 0.16f, 0.72f, 0.38f, is_done,
+                                on_toggle_done, (void *)(intptr_t)h->id));
 
-    Rid skip_btn = ui_button(is_skipped ? "Skipped" : "Skip", on_toggle_skip,
-                             (void *)(intptr_t)h->id);
-    if (is_skipped) Rwidget_set_color(skip_btn, R_COLOR_ACCENT, 0.96f, 0.62f, 0.04f, 1.0f);
-    add_center(col, skip_btn);
+    add_center(col, pill_button(is_skipped ? "Skipped" : "Skip", 0.95f, 0.60f, 0.05f, is_skipped,
+                                on_toggle_skip, (void *)(intptr_t)h->id));
     return card;
 }
 
@@ -472,7 +547,7 @@ static void build_today(Rid root) {
     if (n == 0) {
         Rid empty = ui_vbox(8.0f);
         Rwidget_add_child(empty, ui_muted("Nothing planned for this day.", 14.0f));
-        Rwidget_add_child(empty, ui_button("New habit", on_new_habit, NULL));
+        Rwidget_add_child(empty, ui_primary_button("New habit", on_new_habit, NULL));
         Rwidget_add_child(list, empty);
     }
     for (size_t i = 0; i < n; i++) Rwidget_add_child(list, habit_row(items[i]));
@@ -511,7 +586,7 @@ static void build_quitting(Rid root) {
     Rid head = ui_hbox(10.0f);
     Rwidget_add_child(head, ui_label("Quitting", 26.0f, 1));
     Rwidget_add_child(head, ui_spacer());
-    Rwidget_add_child(head, ui_button("New bad habit", on_new_quit, NULL));
+    Rwidget_add_child(head, ui_primary_button("New bad habit", on_new_quit, NULL));
     Rwidget_add_child(root, head);
 
     g_app.quit_count = 0;
@@ -547,7 +622,7 @@ static void build_quitting(Rid root) {
         Rwidget_add_child(content, ui_spacer());
         add_center(content, ui_button("Relapsed", on_quit_reset, (void *)(intptr_t)q->id));
         add_center(content, ui_button("Edit", on_edit_quit, (void *)(intptr_t)q->id));
-        add_center(content, ui_button("Delete", on_delete_quit, (void *)(intptr_t)q->id));
+        add_center(content, ui_danger_button("Delete", on_delete_quit, (void *)(intptr_t)q->id));
 
         if (g_app.quit_count < 64) {
             g_app.quit_labels[g_app.quit_count] = timer;
@@ -629,8 +704,7 @@ static void open_note_form(int64_t habit_id) {
     Rid buttons = ui_hbox(8.0f);
     Rwidget_add_child(buttons, ui_spacer());
     Rwidget_add_child(buttons, ui_button("Cancel", on_dialog_cancel, NULL));
-    Rid save = ui_button("Save", note_save, f);
-    Rbutton_set_style(save, R_BUTTON_PRIMARY);
+    Rid save = ui_primary_button("Save", note_save, f);
     Rwidget_add_child(buttons, save);
     Rwidget_add_child(form, buttons);
 
@@ -823,8 +897,7 @@ static void open_habit_form(const Habit *edit) {
     Rid buttons = ui_hbox(8.0f);
     Rwidget_add_child(buttons, ui_spacer());
     Rwidget_add_child(buttons, ui_button("Cancel", on_dialog_cancel, NULL));
-    Rid save = ui_button("Save", habit_save, f);
-    Rbutton_set_style(save, R_BUTTON_PRIMARY);
+    Rid save = ui_primary_button("Save", habit_save, f);
     Rwidget_add_child(buttons, save);
     Rwidget_add_child(form, buttons);
 
@@ -867,6 +940,22 @@ static void on_restore_habit(Rid button, void *ud) {
     h->archived_date[0] = '\0';
     save_db();
     rebuild();
+}
+
+static void on_move_up(Rid button, void *ud) {
+    (void)button;
+    if (db_habit_move(&g_app.db, (int64_t)(intptr_t)ud, -1)) {
+        save_db();
+        rebuild();
+    }
+}
+
+static void on_move_down(Rid button, void *ud) {
+    (void)button;
+    if (db_habit_move(&g_app.db, (int64_t)(intptr_t)ud, 1)) {
+        save_db();
+        rebuild();
+    }
 }
 
 static void on_clear_stats(Rid button, void *ud) {
@@ -953,8 +1042,7 @@ static void open_quit_form(const Quit *edit) {
     Rid buttons = ui_hbox(8.0f);
     Rwidget_add_child(buttons, ui_spacer());
     Rwidget_add_child(buttons, ui_button("Cancel", on_dialog_cancel, NULL));
-    Rid save = ui_button("Save", quit_save, f);
-    Rbutton_set_style(save, R_BUTTON_PRIMARY);
+    Rid save = ui_primary_button("Save", quit_save, f);
     Rwidget_add_child(buttons, save);
     Rwidget_add_child(form, buttons);
 
@@ -994,7 +1082,7 @@ static void build_habits(Rid root) {
     Rid head = ui_hbox(10.0f);
     Rwidget_add_child(head, ui_label("Habits", 26.0f, 1));
     Rwidget_add_child(head, ui_spacer());
-    Rwidget_add_child(head, ui_button("New habit", on_new_habit, NULL));
+    Rwidget_add_child(head, ui_primary_button("New habit", on_new_habit, NULL));
     Rwidget_add_child(root, head);
 
     Rid scroll = Rwidget_create(R_WIDGET_SCROLL_BOX);
@@ -1017,9 +1105,17 @@ static void build_habits(Rid root) {
         Rwidget_add_child(col, ui_muted(sched, 12.0f));
         add_center(content, col);
         Rwidget_add_child(content, ui_spacer());
+        Rid up = ui_button("↑", on_move_up, (void *)(intptr_t)h->id);
+        Rid down = ui_button("↓", on_move_down, (void *)(intptr_t)h->id);
+        Rwidget_set_size(up, 26.0f, 26.0f);
+        Rwidget_set_size(down, 26.0f, 26.0f);
+        Rwidget_set_tooltip(up, "Move up");
+        Rwidget_set_tooltip(down, "Move down");
+        add_center(content, up);
+        add_center(content, down);
         Rid edit = ui_button("Edit", on_edit_habit, (void *)(intptr_t)h->id);
         Rid arch = ui_button("Archive", on_archive_habit, (void *)(intptr_t)h->id);
-        Rid del = ui_button("Delete", on_delete_habit, (void *)(intptr_t)h->id);
+        Rid del = ui_danger_button("Delete", on_delete_habit, (void *)(intptr_t)h->id);
         Rwidget_set_color(del, R_COLOR_TEXT, 0.94f, 0.38f, 0.38f, 1.0f);
         add_center(content, edit);
         add_center(content, arch);
@@ -1047,7 +1143,7 @@ static void build_habits(Rid root) {
             add_center(content, col);
             Rwidget_add_child(content, ui_spacer());
             add_center(content, ui_button("Restore", on_restore_habit, (void *)(intptr_t)h->id));
-            add_center(content, ui_button("Delete", on_delete_habit, (void *)(intptr_t)h->id));
+            add_center(content, ui_danger_button("Delete", on_delete_habit, (void *)(intptr_t)h->id));
             Rwidget_add_child(list, card);
         }
     }
@@ -1152,10 +1248,10 @@ static void build_stats(Rid root) {
 
     Rid actions = ui_hbox(8.0f);
     const Habit *selected = db_habit_by_id_c(&g_app.db, g_app.stats_habit);
-    Rwidget_add_child(actions, ui_button("Clear statistics", on_clear_stats,
+    Rwidget_add_child(actions, ui_danger_button("Clear statistics", on_clear_stats,
                                          (void *)(intptr_t)g_app.stats_habit));
     if (selected && selected->archived)
-        Rwidget_add_child(actions, ui_button("Delete habit", on_delete_habit,
+        Rwidget_add_child(actions, ui_danger_button("Delete habit", on_delete_habit,
                                              (void *)(intptr_t)g_app.stats_habit));
     Rwidget_add_child(root, actions);
 

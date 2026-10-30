@@ -189,6 +189,45 @@ Habit *db_habit_add(DB *db) {
     return h;
 }
 
+static int active_habit_cmp(const void *a, const void *b) {
+    const Habit *ha = *(const Habit *const *)a;
+    const Habit *hb = *(const Habit *const *)b;
+    if (ha->sort_order != hb->sort_order) return ha->sort_order < hb->sort_order ? -1 : 1;
+    return ha->id < hb->id ? -1 : (ha->id > hb->id ? 1 : 0);
+}
+
+bool db_habit_move(DB *db, int64_t id, int delta) {
+    if (delta != -1 && delta != 1) return false;
+    Habit **order = xmalloc((db->nhabits + 1) * sizeof *order);
+    size_t n = 0;
+    for (size_t i = 0; i < db->nhabits; i++)
+        if (!db->habits[i].archived) order[n++] = &db->habits[i];
+    qsort(order, n, sizeof *order, active_habit_cmp);
+
+    size_t pos = n;
+    for (size_t i = 0; i < n; i++)
+        if (order[i]->id == id) {
+            pos = i;
+            break;
+        }
+    if (pos == n) {
+        free(order);
+        return false;
+    }
+    long target = (long)pos + delta;
+    if (target < 0 || target >= (long)n) {
+        free(order);
+        return false;
+    }
+    /* renumber first so equal sort_order values cannot keep the items stuck */
+    for (size_t i = 0; i < n; i++) order[i]->sort_order = (int)(i + 1) * 10;
+    int tmp = order[pos]->sort_order;
+    order[pos]->sort_order = order[target]->sort_order;
+    order[target]->sort_order = tmp;
+    free(order);
+    return true;
+}
+
 size_t db_entries_remove_habit(DB *db, int64_t habit_id) {
     size_t removed = 0;
     size_t w = 0;

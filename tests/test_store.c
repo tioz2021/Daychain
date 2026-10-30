@@ -186,10 +186,36 @@ static void test_clear_entries(void) {
     db_free(&db);
 }
 
+static void test_habit_move(void) {
+    DB db;
+    db_init(&db);
+    Habit *a = test_add_habit(&db, "a", SCHED_DAILY, 0, 0, "2026-10-01");
+    Habit *b = test_add_habit(&db, "b", SCHED_DAILY, 0, 0, "2026-10-01");
+    Habit *c = test_add_habit(&db, "c", SCHED_DAILY, 0, 0, "2026-10-01");
+    CHECK(a->sort_order < b->sort_order && b->sort_order < c->sort_order);
+
+    CHECK(db_habit_move(&db, b->id, -1));
+    CHECK(b->sort_order < a->sort_order);
+    CHECK(!db_habit_move(&db, b->id, -1));
+
+    CHECK(db_habit_move(&db, b->id, 1));
+    CHECK(a->sort_order < b->sort_order);
+
+    CHECK(db_habit_move(&db, c->id, -1));
+    CHECK(c->sort_order < b->sort_order);
+    CHECK(db_habit_move(&db, c->id, 1));
+    CHECK(c->sort_order > b->sort_order);
+    CHECK(!db_habit_move(&db, c->id, 1));
+
+    CHECK(!db_habit_move(&db, 999, 1));
+    db_free(&db);
+}
+
 void test_store(void) {
     test_roundtrip();
     test_tolerates_corruption();
     test_drops_orphan_entries();
     test_refuses_newer_schema();
     test_clear_entries();
+    test_habit_move();
 }
