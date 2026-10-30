@@ -13,6 +13,9 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/file.h>
 
 #include "core/model.h"
 #include "core/schedule.h"
@@ -1107,6 +1110,36 @@ static void usage(void) {
            APP_VERSION);
 }
 
+/* The same lock file the web server uses: two writers on one JSONL file would race. */
+static int acquire_lock(const char *data_dir, char *err, size_t errsz) {
+    char *locks = path_join(data_dir, "locks");
+    if (mkdir_p(locks) != 0) {
+        snprintf(err, errsz, "Cannot create %s", locks);
+        free(locks);
+        return -1;
+    }
+    char *path = path_join(locks, "habits.lock");
+    int fd = open(path, O_RDWR | O_CREAT, 0644);
+    if (fd < 0) {
+        snprintf(err, errsz, "Cannot open %s", path);
+        free(path);
+        free(locks);
+        return -1;
+    }
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        snprintf(err, errsz,
+                 "Habits is already running: another window or the web server holds the lock "
+                 "on this data directory.");
+        close(fd);
+        free(path);
+        free(locks);
+        return -1;
+    }
+    free(path);
+    free(locks);
+    return fd;
+}
+
 static char *resolve_data_dir(const char *arg) {
     if (arg) return xstrdup(arg);
     const char *env = getenv("HABITS_DATA_DIR");
@@ -1150,6 +1183,9 @@ int main(int argc, char **argv) {
     free(dir);
     mkdir_p(g_app.data_dir);
 
+    char lock_err[512] = "";
+    int lock_fd = acquire_lock(g_app.data_dir, lock_err, sizeof lock_err);
+
     char err[512] = "";
     if (!store_load(&g_app.db, g_app.data_dir, err, sizeof err)) {
         fprintf(stderr, "habits-desktop: %s\n", err);
@@ -1187,6 +1223,13 @@ int main(int argc, char **argv) {
     Rwidget_add_child(root, g_app.content);
 
     rebuild();
+
+    if (lock_fd < 0) {
+        Rmessage_box(g_app.window, "Habits", lock_err, R_MESSAGE_OK);
+        Rshutdown();
+        db_free(&g_app.db);
+        return 1;
+    }
 
     const char *dialog_env = getenv("HABITS_DIALOG");
     if (dialog_env && *dialog_env) {
@@ -1227,6 +1270,7 @@ int main(int argc, char **argv) {
     while (Rwait_frame(-1.0)) {
     }
     save_db();
+    close(lock_fd);
     Rshutdown();
     db_free(&g_app.db);
     return 0;
