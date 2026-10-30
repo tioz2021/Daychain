@@ -8,6 +8,11 @@ executable.
 
 ![Quitting tracker](docs/screenshot-quitting.png)
 
+There is also a **native desktop client** on [Raven](https://github.com/oscar-soirey/Raven)
+(C11 + Vulkan): no browser and no web server, same core and the same JSONL file.
+
+![Native desktop client](docs/desktop-today.png)
+
 ## Why
 
 - **No dependencies.** Only libc and POSIX: `make` and run. No Node, no Python, no
@@ -32,6 +37,28 @@ executable.
 - Three UI languages: English, Russian, Ukrainian. Light and dark themes.
 - Atomic writes with a `.bak` copy; the data file survives `kill -9`.
 - Export everything as JSONL with one click.
+
+## Native desktop client (optional)
+
+`src/desktop/` builds `habits-desktop`, a native window that talks to the same
+`core/` and the same `data/habits.jsonl` as the web build. Nothing is served over HTTP.
+
+Requirements: `libX11-devel`, CMake 3.16+, a C11 compiler and a Vulkan driver.
+
+```sh
+sudo dnf install libX11-devel cmake          # Debian/Ubuntu: libx11-dev cmake
+./tools/get_raven.sh                         # clones and builds Raven into build/
+make desktop                                 # build/habits-desktop
+./build/habits-desktop --data ~/apps/habits/data
+```
+
+Screens: Today, Habits (create, edit, delete, archive), Quitting (live timer,
+relapse reset, edit, delete), Statistics (streak cards and a 12-week heatmap) and
+Settings (data path, version, JSONL export).
+
+Not in the native client yet: day notes, the three UI languages, and drag-and-drop
+ordering. Raven itself is young (0.1.x) and its API changes, which is why the web
+build stays the default, dependency-free front end.
 
 ## Requirements
 
@@ -122,6 +149,7 @@ make test     # unit and API tests (no network, no fixtures)
 make asan     # the same tests with ASan/UBSan (needs libasan)
 make fmt      # clang-format
 node tools/check_i18n.mjs   # the three UI dictionaries must have the same keys
+make desktop  # native client, needs Raven: ./tools/get_raven.sh
 ```
 
 The test suite covers date math, the JSON parser (including malformed input), the
