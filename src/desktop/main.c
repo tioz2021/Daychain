@@ -709,13 +709,18 @@ static void dialog_closed(Rid content, int result, void *ud) {
 
 typedef struct {
     Rid text;
+    Rid error;
     int64_t habit_id;
     int32_t day;
 } NoteForm;
 
 static void note_save(Rid button, void *ud) {
     NoteForm *f = ud;
-    const char *note = Rtext_input_get_text(f->text);
+    const char *note = Rtext_editor_get_text(f->text);
+    if (note && utf8_chars(note) > 500) {
+        Rlabel_set_text(f->error, "Note is too long (max 500 characters)");
+        return;
+    }
     const Entry *e = db_entry_find_c(&g_app.db, f->habit_id, f->day);
     if (!e && (!note || !*note)) {
         Rdialog_close(button, 0);
@@ -737,11 +742,15 @@ static void open_note_form(int64_t habit_id) {
     Rid form = ui_vbox(8.0f);
     Rwidget_set_min_size(form, 420.0f, 0.0f);
     Rwidget_add_child(form, ui_label("Note", 18.0f, 1));
-    f->text = Rwidget_create(R_WIDGET_TEXT_INPUT);
-    Rtext_input_set_placeholder(f->text, "How did it go?");
-    Rtext_input_set_max_length(f->text, 500);
-    if (e) Rtext_input_set_text(f->text, e->note);
+    f->text = Rtext_editor_create("");
+    Rtext_editor_set_placeholder(f->text, "How did it go?");
+    Rtext_editor_set_line_numbers(f->text, R_FALSE);
+    if (e) Rtext_editor_set_text(f->text, e->note);
+    Rwidget_set_size(f->text, 400.0f, 130.0f);
     Rwidget_add_child(form, f->text);
+    f->error = ui_muted("", 12.0f);
+    Rlabel_set_color(f->error, 0.95f, 0.35f, 0.35f, 1.0f);
+    Rwidget_add_child(form, f->error);
 
     Rid buttons = ui_hbox(8.0f);
     Rwidget_add_child(buttons, ui_spacer());
@@ -1745,6 +1754,8 @@ int main(int argc, char **argv) {
     if (dialog_env && *dialog_env) {
         if (strcmp(dialog_env, "habit") == 0)
             open_habit_form(NULL);
+        else if (strcmp(dialog_env, "note") == 0 && g_app.db.nhabits > 0)
+            open_note_form(g_app.db.habits[0].id);
         else if (strcmp(dialog_env, "habit-edit") == 0 && g_app.db.nhabits > 0)
             open_habit_form(&g_app.db.habits[0]);
         else if (strcmp(dialog_env, "quit") == 0) open_quit_form(NULL);
