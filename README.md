@@ -77,6 +77,14 @@ The browser opens automatically. To build with CMake (e.g. in CLion):
 cmake -S . -B build-cmake && cmake --build build-cmake
 ```
 
+The native client is an optional CMake target and is off by default, so the web
+build never needs X11 or Raven:
+
+```sh
+./tools/get_raven.sh
+cmake -S . -B build-cmake -DHABITS_DESKTOP=ON && cmake --build build-cmake
+```
+
 ## Command line
 
 ```
