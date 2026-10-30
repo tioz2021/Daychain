@@ -281,17 +281,22 @@ static void on_nav(Rid button, void *ud) {
     rebuild();
 }
 
-static Rid nav_button(const char *text, Screen screen, int index) {
+static Rid nav_row(const char *text, Screen screen, int index) {
     Rid bg = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_corner_radius(bg, 9.0f, 9.0f, 9.0f, 9.0f);
-    Rborder_set_padding(bg, 10.0f, 3.0f, 10.0f, 3.0f);
+    Rborder_set_padding(bg, 0.0f, 2.0f, 0.0f, 2.0f);
     Rborder_set_background(bg, 0.0f, 0.0f, 0.0f, 0.0f);
+
     Rid button = ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
-    /* The pill behind the entry is the highlight; a focus ring on the button
-       would draw a second rectangle inside it. */
+    /* Only the active entry is highlighted: the button's own hover and press
+       fills would paint a rectangle inside (or behind) the pill. */
+    Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, 0.0f, 0.0f, 0.0f, 0.0f);
+    Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, 0.0f, 0.0f, 0.0f, 0.0f);
     Rwidget_set_focusable(button, R_FALSE);
     Rwidget_add_child(bg, button);
+
     g_app.nav_bg[index] = bg;
+    g_app.nav[index] = button;
     return bg;
 }
 
@@ -1359,9 +1364,7 @@ static void build_sidebar(Rid sidebar) {
                                               "Settings"};
     for (int i = 0; i < SCREEN_COUNT; i++) {
         if (i == SCREEN_SETTINGS) Rwidget_add_child(sidebar, ui_spacer());
-        Rid row = nav_button(names[i], (Screen)i, i);
-        g_app.nav[i] = Rwidget_get_child(row, 0);
-        Rwidget_add_child(sidebar, row);
+        Rwidget_add_child(sidebar, nav_row(names[i], (Screen)i, i));
     }
     Rwidget_add_child(sidebar, ui_muted("v" APP_VERSION, 11.0f));
 }
@@ -1370,11 +1373,11 @@ static void rebuild(void) {
     for (int i = 0; i < SCREEN_COUNT; i++) {
         if (!g_app.nav[i]) continue;
         if (i == (int)g_app.screen) {
+            Rborder_set_background(g_app.nav_bg[i], 0.31f, 0.55f, 1.0f, 0.16f);
             Rwidget_set_color(g_app.nav[i], R_COLOR_TEXT, 0.31f, 0.55f, 1.0f, 1.0f);
-            Rborder_set_background(g_app.nav_bg[i], 0.31f, 0.55f, 1.0f, 0.15f);
         } else {
-            Rwidget_clear_color(g_app.nav[i], R_COLOR_TEXT);
             Rborder_set_background(g_app.nav_bg[i], 0.0f, 0.0f, 0.0f, 0.0f);
+            Rwidget_clear_color(g_app.nav[i], R_COLOR_TEXT);
         }
     }
     Rwidget_clear_children(g_app.content);
