@@ -18,12 +18,12 @@ TEST_SRC := $(wildcard tests/*.c)
 
 .PHONY: all run test asan clean fmt
 
-all: $(BUILD)/habits
+all: $(BUILD)/daychain
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(BUILD)/habits: $(APP_SRC) | $(BUILD)
+$(BUILD)/daychain: $(APP_SRC) | $(BUILD)
 	@test -f $(RAVEN_LIB) || { \
 		echo "Raven is not built: run ./tools/get_raven.sh first"; exit 1; }
 	$(CC) $(WARN) $(CFLAGS) -I$(RAVEN_DIR)/include -o $@ $(APP_SRC) \
@@ -35,8 +35,8 @@ $(BUILD)/tests: $(CORE_SRC) $(TEST_SRC) | $(BUILD)
 $(BUILD)/tests-asan: $(CORE_SRC) $(TEST_SRC) | $(BUILD)
 	$(CC) $(WARN) $(CFLAGS) $(SAN) -o $@ $(CORE_SRC) $(TEST_SRC)
 
-run: $(BUILD)/habits
-	./$(BUILD)/habits
+run: $(BUILD)/daychain
+	./$(BUILD)/daychain
 
 test: $(BUILD)/tests
 	./$(BUILD)/tests

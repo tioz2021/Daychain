@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(habits C)
+project(daychain C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -19,14 +19,14 @@ endif()
 file(GLOB APP_SOURCES CONFIGURE_DEPENDS src/desktop/*.c src/core/*.c)
 list(APPEND APP_SOURCES src/infra/util.c src/infra/json.c)
 
-add_executable(habits ${APP_SOURCES})
-target_include_directories(habits PRIVATE src "${RAVEN_DIR}/include")
+add_executable(daychain ${APP_SOURCES})
+target_include_directories(daychain PRIVATE src "${RAVEN_DIR}/include")
 
 # A local sysroot is used when the X11 headers are not installed system-wide.
 set(SYSROOT "${CMAKE_SOURCE_DIR}/build/sysroot")
 if(EXISTS "${SYSROOT}/usr/include/X11/Xlib.h")
-    target_include_directories(habits PRIVATE "${SYSROOT}/usr/include")
-    target_link_directories(habits PRIVATE "${SYSROOT}/usr/lib64")
+    target_include_directories(daychain PRIVATE "${SYSROOT}/usr/include")
+    target_link_directories(daychain PRIVATE "${SYSROOT}/usr/lib64")
 endif()
 
-target_link_libraries(habits PRIVATE "${RAVEN_LIB}" X11 pthread dl m)
+target_link_libraries(daychain PRIVATE "${RAVEN_LIB}" X11 pthread dl m)

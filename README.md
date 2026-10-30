@@ -1,8 +1,10 @@
-# habits
+# Daychain
 
-A native habit tracker for Linux, written in C11 on top of
+Daychain — a native habit tracker for Linux, written in C11 on top of
 [Raven](https://github.com/oscar-soirey/Raven). One window, one binary, and a
 plain JSONL file next to it — no browser, no web server, no database.
+
+*Every day is a link in the chain.*
 
 ![Today](docs/desktop-today.png)
 
@@ -47,8 +49,8 @@ Raven itself is fetched and built by the project — it is not vendored.
 
 ```sh
 ./tools/get_raven.sh      # clones Raven into build/ and builds libraven.a
-make                      # builds build/habits
-./build/habits
+make                      # builds build/daychain
+./build/daychain
 ```
 
 With CMake (for example in CLion), run `tools/get_raven.sh` first, then:
@@ -60,17 +62,20 @@ cmake -S . -B build-cmake && cmake --build build-cmake
 ## Data
 
 ```
-habits/
-├── habits               # the binary
+daychain/
+├── daychain             # the binary
 └── data/
     ├── habits.jsonl     # the whole state
     ├── habits.jsonl.bak # previous version
     └── locks/           # instance lock
 ```
 
+The data file keeps the names `habits.jsonl` / `habits.jsonl.bak` (and
+`locks/habits.lock`) from earlier versions, so existing data needs no migration.
+
 The data directory defaults to `<directory of the executable>/data`; use
-`--data <dir>` or `$HABITS_DATA_DIR` to change it. Install the binary into a
-folder you own (for example `~/apps/habits/`), because the program refuses to
+`--data <dir>` or `$DAYCHAIN_DATA_DIR` to change it. Install the binary into a
+folder you own (for example `~/apps/daychain/`), because the program refuses to
 start when the data directory is not writable.
 
 `habits.jsonl` is UTF-8, one JSON object per line: a `meta` line with
@@ -82,7 +87,7 @@ write the same file: the second one is refused by a lock.
 ## Command line
 
 ```
-habits [options]
+daychain [options]
 
   --data <dir>   data directory (default: <exe dir>/data)
   --screen <s>   start on today, habits, quitting, stats or settings
@@ -90,7 +95,7 @@ habits [options]
   --help         print this help and exit
 ```
 
-`HABITS_FRAMES=<n> HABITS_SHOT=<out.ppm> habits` renders a few frames, saves
+`DAYCHAIN_FRAMES=<n> DAYCHAIN_SHOT=<out.ppm> daychain` renders a few frames, saves
 the window as a PPM image and exits — that is how the screenshots in `docs/`
 are made (`tools/ppm2png.py` converts them to PNG).
 

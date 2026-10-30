@@ -1,5 +1,5 @@
 /*
- * habits — native client built on Raven.
+ * Daychain — native client built on Raven.
  *
  * Reuses the same core and JSONL storage as the web build: no HTTP server,
  * no browser. Run with --data <dir> (default: <exe dir>/data).
@@ -23,7 +23,7 @@
 #include "core/store.h"
 #include "infra/util.h"
 
-#define APP_VERSION "2.0.0"
+#define APP_VERSION "2.1.0"
 
 typedef enum {
     SCREEN_TODAY = 0,
@@ -1423,7 +1423,7 @@ static void on_export(Rid button, void *ud) {
     char name[128];
     char date[11];
     date_format(date_today(), date);
-    snprintf(name, sizeof name, "habits-%s.jsonl", date);
+    snprintf(name, sizeof name, "daychain-%s.jsonl", date);
     const char *home = getenv("HOME");
     char *dst = home ? path_join(home, name) : xstrdup(name);
     bool ok = file_write_atomic(dst, text, len);
@@ -1480,7 +1480,7 @@ static void build_settings(Rid root) {
     Rwidget_add_child(col, export_row);
 
     settings_section(col, "ABOUT");
-    Rid version_row = setting_row(col, "Version", "habits " APP_VERSION);
+    Rid version_row = setting_row(col, "Version", "daychain " APP_VERSION);
     (void)version_row;
     Rwidget_add_child(col,
                       ui_muted("A native client on Raven. The data is a plain JSONL "
@@ -1612,9 +1612,9 @@ static void on_error(RError code, RSeverity severity, const char *detail) {
 }
 
 static void usage(void) {
-    printf("habits %s — native client\n"
-           "Usage: habits [--data <dir>]\n"
-           "Screenshot mode: HABITS_FRAMES=<n> HABITS_SHOT=<out.ppm>\n",
+    printf("daychain %s — native client\n"
+           "Usage: daychain [--data <dir>]\n"
+           "Screenshot mode: DAYCHAIN_FRAMES=<n> DAYCHAIN_SHOT=<out.ppm>\n",
            APP_VERSION);
 }
 
@@ -1650,7 +1650,7 @@ static int acquire_lock(const char *data_dir, char *err, size_t errsz) {
 
 static char *resolve_data_dir(const char *arg) {
     if (arg) return xstrdup(arg);
-    const char *env = getenv("HABITS_DATA_DIR");
+    const char *env = getenv("DAYCHAIN_DATA_DIR");
     if (env && *env) return xstrdup(env);
     char *exe = exe_dir();
     char *dir = exe ? path_join(exe, "data") : xstrdup("data");
@@ -1668,7 +1668,7 @@ int main(int argc, char **argv) {
             usage();
             return 0;
         } else if (strcmp(argv[i], "--version") == 0) {
-            printf("habits %s\n", APP_VERSION);
+            printf("daychain %s\n", APP_VERSION);
             return 0;
         } else if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
@@ -1696,7 +1696,7 @@ int main(int argc, char **argv) {
 
     char err[512] = "";
     if (!store_load(&g_app.db, g_app.data_dir, err, sizeof err)) {
-        fprintf(stderr, "habits: %s\n", err);
+        fprintf(stderr, "daychain: %s\n", err);
         return 1;
     }
     if (!screen_given) g_app.screen = SCREEN_TODAY;
@@ -1704,14 +1704,14 @@ int main(int argc, char **argv) {
 
     Rerror_set_callback(on_error);
     if (!Rinit(R_BACKEND_VULKAN)) {
-        fprintf(stderr, "habits: cannot start Raven (Vulkan driver?)\n");
+        fprintf(stderr, "daychain: cannot start Raven (Vulkan driver?)\n");
         return 1;
     }
     g_app.animations = 1;
     load_prefs();
     apply_appearance();
 
-    g_app.window = Rwindow_create("Habits", 1040, 700, R_WINDOW_DEFAULT);
+    g_app.window = Rwindow_create("Daychain", 1040, 700, R_WINDOW_DEFAULT);
     Rwindow_set_min_size(g_app.window, 880, 560);
     Rwindow_set_close_callback(g_app.window, on_window_close, NULL);
 
@@ -1720,13 +1720,13 @@ int main(int argc, char **argv) {
     rebuild_all();
 
     if (lock_fd < 0) {
-        Rmessage_box(g_app.window, "Habits", lock_err, R_MESSAGE_OK);
+        Rmessage_box(g_app.window, "Daychain", lock_err, R_MESSAGE_OK);
         Rshutdown();
         db_free(&g_app.db);
         return 1;
     }
 
-    const char *dialog_env = getenv("HABITS_DIALOG");
+    const char *dialog_env = getenv("DAYCHAIN_DIALOG");
     if (dialog_env && *dialog_env) {
         if (strcmp(dialog_env, "habit") == 0)
             open_habit_form(NULL);
@@ -1736,14 +1736,14 @@ int main(int argc, char **argv) {
     }
 
     /* Screenshot mode for the docs: render N frames, save the window, exit. */
-    const char *frames_env = getenv("HABITS_FRAMES");
+    const char *frames_env = getenv("DAYCHAIN_FRAMES");
     if (frames_env && *frames_env) {
         int frames = atoi(frames_env);
         for (int i = 0; i < frames && Ris_running(); i++) {
             Rwindow_request_redraw(g_app.window);
             Rwait_frame(0.016);
         }
-        const char *shot = getenv("HABITS_SHOT");
+        const char *shot = getenv("DAYCHAIN_SHOT");
         if (shot && Rwindow_is_valid(g_app.window)) {
             int w = 0, h = 0;
             uint8_t *pixels = Rwindow_capture(g_app.window, &w, &h);
