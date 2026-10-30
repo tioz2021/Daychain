@@ -284,14 +284,12 @@ static void on_nav(Rid button, void *ud) {
 static Rid nav_row(const char *text, Screen screen, int index) {
     Rid bg = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_corner_radius(bg, 9.0f, 9.0f, 9.0f, 9.0f);
-    Rborder_set_padding(bg, 0.0f, 2.0f, 0.0f, 2.0f);
+    Rborder_set_padding(bg, 0.0f, 0.0f, 0.0f, 0.0f);
     Rborder_set_background(bg, 0.0f, 0.0f, 0.0f, 0.0f);
 
     Rid button = ui_flat_button(text, on_nav, (void *)(intptr_t)screen);
-    /* Only the active entry is highlighted: the button's own hover and press
-       fills would paint a rectangle inside (or behind) the pill. */
-    Rwidget_set_color(button, R_COLOR_CONTROL_HOVERED, 0.0f, 0.0f, 0.0f, 0.0f);
-    Rwidget_set_color(button, R_COLOR_CONTROL_PRESSED, 0.0f, 0.0f, 0.0f, 0.0f);
+    /* The hover fill must have exactly the shape of the pill behind it. */
+    Rwidget_set_metric(button, R_METRIC_CORNER_RADIUS, 9.0f);
     Rwidget_set_focusable(button, R_FALSE);
     Rwidget_add_child(bg, button);
 
@@ -1375,9 +1373,14 @@ static void rebuild(void) {
         if (i == (int)g_app.screen) {
             Rborder_set_background(g_app.nav_bg[i], 0.31f, 0.55f, 1.0f, 0.16f);
             Rwidget_set_color(g_app.nav[i], R_COLOR_TEXT, 0.31f, 0.55f, 1.0f, 1.0f);
+            /* hovering the current entry keeps the accent colour untinted */
+            Rwidget_set_color(g_app.nav[i], R_COLOR_CONTROL_HOVERED, 0.31f, 0.55f, 1.0f, 0.10f);
+            Rwidget_set_color(g_app.nav[i], R_COLOR_CONTROL_PRESSED, 0.31f, 0.55f, 1.0f, 0.18f);
         } else {
             Rborder_set_background(g_app.nav_bg[i], 0.0f, 0.0f, 0.0f, 0.0f);
             Rwidget_clear_color(g_app.nav[i], R_COLOR_TEXT);
+            Rwidget_clear_color(g_app.nav[i], R_COLOR_CONTROL_HOVERED);
+            Rwidget_clear_color(g_app.nav[i], R_COLOR_CONTROL_PRESSED);
         }
     }
     Rwidget_clear_children(g_app.content);
