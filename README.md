@@ -18,7 +18,8 @@ plain JSONL file next to it — no browser, no web server, no database.
   best attempt, the number of attempts, and a "relapsed" reset that keeps the
   record.
 - **History**: browse past days with the arrows and mark them there.
-- **Archive** instead of deleting, or delete with a confirmation.
+- **Archive** instead of deleting. Archived habits are listed on the Habits screen, where they can be restored or deleted for good.
+- **Clear statistics** of any habit from the Statistics screen (the marks go, the habit stays); an archived habit can be deleted right there too.
 - **Export** the whole database as JSONL from Settings.
 - **Light and dark themes**, switched in Settings and remembered between runs.
 - **Animations can be turned off** in Settings (Raven stops its transitions), also remembered.

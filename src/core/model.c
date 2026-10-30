@@ -189,6 +189,22 @@ Habit *db_habit_add(DB *db) {
     return h;
 }
 
+size_t db_entries_remove_habit(DB *db, int64_t habit_id) {
+    size_t removed = 0;
+    size_t w = 0;
+    for (size_t r = 0; r < db->nentries; r++) {
+        if (db->entries[r].habit_id == habit_id) {
+            free(db->entries[r].note);
+            removed++;
+            continue;
+        }
+        if (w != r) db->entries[w] = db->entries[r];
+        w++;
+    }
+    db->nentries = w;
+    return removed;
+}
+
 void db_habit_remove(DB *db, int64_t id) {
     size_t i;
     for (i = 0; i < db->nhabits; i++)

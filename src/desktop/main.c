@@ -803,6 +803,34 @@ static void on_archive_habit(Rid button, void *ud) {
     rebuild();
 }
 
+static void on_restore_habit(Rid button, void *ud) {
+    (void)button;
+    Habit *h = db_habit_by_id(&g_app.db, (int64_t)(intptr_t)ud);
+    if (!h) return;
+    h->archived = 0;
+    h->archived_date[0] = '\0';
+    save_db();
+    rebuild();
+}
+
+static void on_clear_stats(Rid button, void *ud) {
+    (void)button;
+    int64_t id = (int64_t)(intptr_t)ud;
+    Habit *h = db_habit_by_id(&g_app.db, id);
+    if (!h) return;
+    char text[320];
+    snprintf(text, sizeof text,
+             "Delete all marks of \"%s\"? The habit stays, but its history and "
+             "statistics are gone.",
+             h->name);
+    if (Rmessage_box(g_app.window, "Clear statistics", text, R_MESSAGE_YES_NO) !=
+        R_MESSAGE_RESULT_YES)
+        return;
+    db_entries_remove_habit(&g_app.db, id);
+    save_db();
+    rebuild();
+}
+
 static void on_delete_habit(Rid button, void *ud) {
     (void)button;
     int64_t id = (int64_t)(intptr_t)ud;
@@ -942,6 +970,30 @@ static void build_habits(Rid root) {
         Rwidget_add_child(list, card);
     }
     if (!any) Rwidget_add_child(list, ui_muted("No habits yet. Add the first one.", 14.0f));
+
+    int archived_count = 0;
+    for (size_t i = 0; i < g_app.db.nhabits; i++)
+        if (g_app.db.habits[i].archived) archived_count++;
+    if (archived_count > 0) {
+        Rwidget_add_child(list, ui_muted("Archived", 12.0f));
+        for (size_t i = 0; i < g_app.db.nhabits; i++) {
+            const Habit *h = &g_app.db.habits[i];
+            if (!h->archived) continue;
+            Rid content;
+            Rid card = ui_card(&content);
+            add_center(content, ui_icon_badge(icon_glyph(h->icon), h->color));
+            Rid col = ui_vbox(2.0f);
+            Rwidget_add_child(col, ui_label(h->name, 15.0f, 1));
+            char meta[96];
+            snprintf(meta, sizeof meta, "Archived on %s", h->archived_date);
+            Rwidget_add_child(col, ui_muted(meta, 12.0f));
+            add_center(content, col);
+            Rwidget_add_child(content, ui_spacer());
+            add_center(content, ui_button("Restore", on_restore_habit, (void *)(intptr_t)h->id));
+            add_center(content, ui_button("Delete", on_delete_habit, (void *)(intptr_t)h->id));
+            Rwidget_add_child(list, card);
+        }
+    }
     Rwidget_add_child(root, scroll);
 }
 
@@ -1015,7 +1067,10 @@ static void build_stats(Rid root) {
     Rid habit_combo = Rwidget_create(R_WIDGET_COMBO_BOX);
     int sel = 0;
     for (size_t i = 0; i < g_app.db.nhabits; i++) {
-        Rcombo_box_add_item(habit_combo, g_app.db.habits[i].name);
+        char item[256];
+        snprintf(item, sizeof item, "%s%s", g_app.db.habits[i].name,
+                 g_app.db.habits[i].archived ? "  (archived)" : "");
+        Rcombo_box_add_item(habit_combo, item);
         if (g_app.db.habits[i].id == g_app.stats_habit) sel = (int)i;
     }
     Rcombo_box_set_selected(habit_combo, sel);
@@ -1035,6 +1090,15 @@ static void build_stats(Rid root) {
     Rcombo_box_set_changed_callback(period, on_stats_period, NULL);
     Rwidget_add_child(bar, period);
     Rwidget_add_child(root, bar);
+
+    Rid actions = ui_hbox(8.0f);
+    const Habit *selected = db_habit_by_id_c(&g_app.db, g_app.stats_habit);
+    Rwidget_add_child(actions, ui_button("Clear statistics", on_clear_stats,
+                                         (void *)(intptr_t)g_app.stats_habit));
+    if (selected && selected->archived)
+        Rwidget_add_child(actions, ui_button("Delete habit", on_delete_habit,
+                                             (void *)(intptr_t)g_app.stats_habit));
+    Rwidget_add_child(root, actions);
 
     const Habit *h = db_habit_by_id_c(&g_app.db, g_app.stats_habit);
     int32_t today = date_today();

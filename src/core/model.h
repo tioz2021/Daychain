@@ -98,6 +98,8 @@ size_t db_entry_count_range(const DB *db, int64_t habit_id, int32_t from, int32_
 /* Append a habit, assigning id and sort_order when they are zero. */
 Habit *db_habit_add(DB *db);
 void db_habit_remove(DB *db, int64_t id);
+/* Delete every entry of a habit, keeping the habit itself. Returns the count. */
+size_t db_entries_remove_habit(DB *db, int64_t habit_id);
 
 /* Field validation; returns false and sets *code / *message. */
 bool habit_validate(Habit *h, const char **code, const char **message);

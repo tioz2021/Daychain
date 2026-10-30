@@ -166,9 +166,30 @@ static void test_refuses_newer_schema(void) {
     free(dir);
 }
 
+static void test_clear_entries(void) {
+    DB db;
+    db_init(&db);
+    Habit *a = test_add_habit(&db, "a", SCHED_DAILY, 0, 0, "2026-10-01");
+    Habit *b = test_add_habit(&db, "b", SCHED_DAILY, 0, 0, "2026-10-01");
+    test_add_entry(&db, a->id, "2026-10-05", ENTRY_DONE);
+    test_add_entry(&db, a->id, "2026-10-06", ENTRY_SKIPPED);
+    test_add_entry(&db, b->id, "2026-10-05", ENTRY_DONE);
+
+    CHECK(db_entries_remove_habit(&db, a->id) == 2);
+    CHECK(db.nentries == 1);
+    CHECK(db_habit_by_id(&db, a->id) != NULL);
+    CHECK(db_entry_find_c(&db, a->id, test_day("2026-10-05")) == NULL);
+    CHECK(db_entry_find_c(&db, b->id, test_day("2026-10-05")) != NULL);
+
+    /* clearing again removes nothing */
+    CHECK(db_entries_remove_habit(&db, a->id) == 0);
+    db_free(&db);
+}
+
 void test_store(void) {
     test_roundtrip();
     test_tolerates_corruption();
     test_drops_orphan_entries();
     test_refuses_newer_schema();
+    test_clear_entries();
 }
