@@ -47,7 +47,8 @@ typedef struct {
 
     int64_t stats_habit;
     int stats_days;
-    int theme_dark;
+    int light;      /* 0 = dark theme, 1 = light theme */
+    Rid root;       /* the HBox that holds the sidebar and the content */
 
     /* Live counters of the quitting screen. */
     Rid quit_timer;
@@ -75,6 +76,8 @@ static void on_delete_habit(Rid button, void *ud);
 static void on_new_quit(Rid button, void *ud);
 static void on_edit_quit(Rid button, void *ud);
 static void on_delete_quit(Rid button, void *ud);
+static void on_toggle_theme(Rid button, void *ud);
+static void rebuild_all(void);
 
 /* ---------- small helpers ---------- */
 
@@ -204,13 +207,23 @@ static Rid ui_card(Rid *content) {
 static Rid ui_icon_badge(const char *glyph, const char *hex) {
     float r, g, b;
     hex_to_rgb(hex, &r, &g, &b);
+    float pr, pg, pb, pa;
+    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
+    /* Blend the habit colour into the panel: a soft chip in both themes. */
+    const float mix = 0.16f;
+    float br = pr * (1.0f - mix) + r * mix;
+    float bg = pg * (1.0f - mix) + g * mix;
+    float bb = pb * (1.0f - mix) + b * mix;
     Rid badge = Rwidget_create(R_WIDGET_BORDER);
     Rwidget_set_size(badge, 40.0f, 40.0f);
-    Rborder_set_background(badge, r * 0.22f + 0.02f, g * 0.22f + 0.02f, b * 0.22f + 0.02f, 1.0f);
+    Rborder_set_background(badge, br, bg, bb, 1.0f);
     Rborder_set_corner_radius(badge, 10.0f, 10.0f, 10.0f, 10.0f);
     Rid label = Rlabel_create(glyph);
     Rlabel_set_text_size(label, 19.0f);
-    Rlabel_set_color(label, r + 0.15f, g + 0.15f, b + 0.15f, 1.0f);
+    if (g_app.light)
+        Rlabel_set_color(label, r * 0.72f, g * 0.72f, b * 0.72f, 1.0f);
+    else
+        Rlabel_set_color(label, r + 0.15f, g + 0.15f, b + 0.15f, 1.0f);
     Rslot_set_halign(label, R_HALIGN_CENTER);
     Rslot_set_valign(label, R_VALIGN_CENTER);
     Rwidget_add_child(badge, label);
@@ -1097,15 +1110,55 @@ static void build_settings(Rid root) {
     Rwidget_add_child(col, ui_muted(g_app.data_dir, 13.0f));
     Rwidget_add_child(col, ui_label("Version", 13.0f, 1));
     Rwidget_add_child(col, ui_muted("habits " APP_VERSION, 13.0f));
+    Rwidget_add_child(col, ui_label("Theme", 13.0f, 1));
+    Rid theme_row = ui_hbox(8.0f);
+    Rwidget_add_child(theme_row, ui_muted(g_app.light ? "Light" : "Dark", 13.0f));
+    Rwidget_add_child(theme_row,
+                      ui_button(g_app.light ? "Use dark theme" : "Use light theme",
+                                on_toggle_theme, NULL));
+    Rwidget_add_child(col, theme_row);
     Rid export_row = ui_hbox(8.0f);
     Rwidget_add_child(export_row, ui_button("Export data", on_export, NULL));
     Rwidget_add_child(col, export_row);
     Rwidget_add_child(col, ui_label("About", 13.0f, 1));
     Rwidget_add_child(col,
-                      ui_muted("Native client on Raven. The web build shares the same "
-                               "JSONL file, so both can be used on the same data.",
+                      ui_muted("A native client on Raven. The data is a plain JSONL "
+                               "file: back it up or move it freely.",
                                12.0f));
     Rwidget_add_child(root, card);
+}
+
+/* ---------- theme ---------- */
+
+static void apply_theme(void) {
+    Rtheme_apply(g_app.light ? R_THEME_LIGHT : R_THEME_DARK);
+}
+
+static void load_prefs(void) {
+    char *path = path_join(g_app.data_dir, "ui.conf");
+    char *text = NULL;
+    size_t len = 0;
+    if (file_read_all(path, &text, &len)) {
+        if (strstr(text, "theme=light")) g_app.light = 1;
+        free(text);
+    }
+    free(path);
+}
+
+static void save_prefs(void) {
+    char *path = path_join(g_app.data_dir, "ui.conf");
+    char buf[64];
+    snprintf(buf, sizeof buf, "theme=%s\n", g_app.light ? "light" : "dark");
+    file_write_atomic(path, buf, strlen(buf));
+    free(path);
+}
+
+static void on_toggle_theme(Rid button, void *ud) {
+    (void)button;
+    (void)ud;
+    g_app.light = !g_app.light;
+    save_prefs();
+    rebuild_all();
 }
 
 /* ---------- window ---------- */
@@ -1144,6 +1197,28 @@ static void rebuild(void) {
         case SCREEN_SETTINGS: build_settings(g_app.content); break;
         default: break;
     }
+}
+
+static void rebuild_all(void) {
+    apply_theme();
+    Rwidget_clear_children(g_app.root);
+    for (int i = 0; i < SCREEN_COUNT; i++) g_app.nav[i] = R_INVALID_ID;
+
+    Rid sidebar = ui_vbox(4.0f);
+    Rwidget_set_size(sidebar, 190.0f, 0.0f);
+    Rslot_set_padding(sidebar, 16.0f, 18.0f, 12.0f, 14.0f);
+    float pr, pg, pb, pa;
+    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
+    Rwidget_set_color(sidebar, R_COLOR_PANEL, pr, pg, pb, 1.0f);
+    Rwidget_add_child(g_app.root, sidebar);
+    build_sidebar(sidebar);
+
+    g_app.content = ui_vbox(14.0f);
+    Rslot_set_fill(g_app.content, 1.0f);
+    Rslot_set_padding(g_app.content, 26.0f, 22.0f, 26.0f, 20.0f);
+    Rwidget_add_child(g_app.root, g_app.content);
+
+    rebuild();
 }
 
 static int on_window_close(Rid window, void *ud) {
@@ -1254,30 +1329,16 @@ int main(int argc, char **argv) {
         fprintf(stderr, "habits: cannot start Raven (Vulkan driver?)\n");
         return 1;
     }
-    Rtheme_apply(R_THEME_DARK);
+    load_prefs();
+    apply_theme();
 
     g_app.window = Rwindow_create("Habits", 1040, 700, R_WINDOW_DEFAULT);
     Rwindow_set_min_size(g_app.window, 880, 560);
     Rwindow_set_close_callback(g_app.window, on_window_close, NULL);
 
-    Rid root = ui_hbox(0.0f);
-    Rwindow_set_content(g_app.window, root);
-
-    Rid sidebar = ui_vbox(4.0f);
-    Rwidget_set_size(sidebar, 190.0f, 0.0f);
-    Rslot_set_padding(sidebar, 16.0f, 18.0f, 12.0f, 14.0f);
-    float pr, pg, pb, pa;
-    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
-    Rwidget_set_color(sidebar, R_COLOR_PANEL, pr, pg, pb, 1.0f);
-    Rwidget_add_child(root, sidebar);
-    build_sidebar(sidebar);
-
-    g_app.content = ui_vbox(14.0f);
-    Rslot_set_fill(g_app.content, 1.0f);
-    Rslot_set_padding(g_app.content, 26.0f, 22.0f, 26.0f, 20.0f);
-    Rwidget_add_child(root, g_app.content);
-
-    rebuild();
+    g_app.root = ui_hbox(0.0f);
+    Rwindow_set_content(g_app.window, g_app.root);
+    rebuild_all();
 
     if (lock_fd < 0) {
         Rmessage_box(g_app.window, "Habits", lock_err, R_MESSAGE_OK);

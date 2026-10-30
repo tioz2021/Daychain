@@ -20,12 +20,13 @@ plain JSONL file next to it — no browser, no web server, no database.
 - **History**: browse past days with the arrows and mark them there.
 - **Archive** instead of deleting, or delete with a confirmation.
 - **Export** the whole database as JSONL from Settings.
+- **Light and dark themes**, switched in Settings and remembered between runs.
 
 The window looks like this:
 
-| Statistics | Quitting |
-|---|---|
-| ![Statistics](docs/desktop-stats.png) | ![Quitting](docs/desktop-quitting.png) |
+| Light theme | Statistics | Quitting |
+|---|---|---|
+| ![Light theme](docs/desktop-light.png) | ![Statistics](docs/desktop-stats.png) | ![Quitting](docs/desktop-quitting.png) |
 
 ## Requirements
 
