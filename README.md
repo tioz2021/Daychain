@@ -21,6 +21,7 @@ plain JSONL file next to it — no browser, no web server, no database.
 - **Archive** instead of deleting, or delete with a confirmation.
 - **Export** the whole database as JSONL from Settings.
 - **Light and dark themes**, switched in Settings and remembered between runs.
+- **Animations can be turned off** in Settings (Raven stops its transitions), also remembered.
 
 The window looks like this:
 

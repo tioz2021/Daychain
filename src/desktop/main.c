@@ -48,6 +48,7 @@ typedef struct {
     int64_t stats_habit;
     int stats_days;
     int light;      /* 0 = dark theme, 1 = light theme */
+    int animations; /* 0 = Raven transitions off */
     Rid root;       /* the HBox that holds the sidebar and the content */
 
     /* Live counters of the quitting screen. */
@@ -77,6 +78,7 @@ static void on_new_quit(Rid button, void *ud);
 static void on_edit_quit(Rid button, void *ud);
 static void on_delete_quit(Rid button, void *ud);
 static void on_toggle_theme(Rid button, void *ud);
+static void on_toggle_animations(Rid button, void *ud);
 static void rebuild_all(void);
 
 /* ---------- small helpers ---------- */
@@ -1117,6 +1119,14 @@ static void build_settings(Rid root) {
                       ui_button(g_app.light ? "Use dark theme" : "Use light theme",
                                 on_toggle_theme, NULL));
     Rwidget_add_child(col, theme_row);
+
+    Rwidget_add_child(col, ui_label("Animations", 13.0f, 1));
+    Rid anim_row = ui_hbox(8.0f);
+    Rwidget_add_child(anim_row, ui_muted(g_app.animations ? "On" : "Off", 13.0f));
+    Rwidget_add_child(anim_row,
+                      ui_button(g_app.animations ? "Turn off animations" : "Turn on animations",
+                                on_toggle_animations, NULL));
+    Rwidget_add_child(col, anim_row);
     Rid export_row = ui_hbox(8.0f);
     Rwidget_add_child(export_row, ui_button("Export data", on_export, NULL));
     Rwidget_add_child(col, export_row);
@@ -1130,8 +1140,9 @@ static void build_settings(Rid root) {
 
 /* ---------- theme ---------- */
 
-static void apply_theme(void) {
+static void apply_appearance(void) {
     Rtheme_apply(g_app.light ? R_THEME_LIGHT : R_THEME_DARK);
+    Rset_animations_enabled(g_app.animations);
 }
 
 static void load_prefs(void) {
@@ -1140,6 +1151,7 @@ static void load_prefs(void) {
     size_t len = 0;
     if (file_read_all(path, &text, &len)) {
         if (strstr(text, "theme=light")) g_app.light = 1;
+        if (strstr(text, "animations=off")) g_app.animations = 0;
         free(text);
     }
     free(path);
@@ -1147,8 +1159,9 @@ static void load_prefs(void) {
 
 static void save_prefs(void) {
     char *path = path_join(g_app.data_dir, "ui.conf");
-    char buf[64];
-    snprintf(buf, sizeof buf, "theme=%s\n", g_app.light ? "light" : "dark");
+    char buf[96];
+    snprintf(buf, sizeof buf, "theme=%s\nanimations=%s\n", g_app.light ? "light" : "dark",
+             g_app.animations ? "on" : "off");
     file_write_atomic(path, buf, strlen(buf));
     free(path);
 }
@@ -1159,6 +1172,15 @@ static void on_toggle_theme(Rid button, void *ud) {
     g_app.light = !g_app.light;
     save_prefs();
     rebuild_all();
+}
+
+static void on_toggle_animations(Rid button, void *ud) {
+    (void)button;
+    (void)ud;
+    g_app.animations = !g_app.animations;
+    save_prefs();
+    apply_appearance();
+    rebuild();
 }
 
 /* ---------- window ---------- */
@@ -1200,7 +1222,7 @@ static void rebuild(void) {
 }
 
 static void rebuild_all(void) {
-    apply_theme();
+    apply_appearance();
     Rwidget_clear_children(g_app.root);
     for (int i = 0; i < SCREEN_COUNT; i++) g_app.nav[i] = R_INVALID_ID;
 
@@ -1329,8 +1351,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "habits: cannot start Raven (Vulkan driver?)\n");
         return 1;
     }
+    g_app.animations = 1;
     load_prefs();
-    apply_theme();
+    apply_appearance();
 
     g_app.window = Rwindow_create("Habits", 1040, 700, R_WINDOW_DEFAULT);
     Rwindow_set_min_size(g_app.window, 880, 560);
