@@ -396,6 +396,13 @@ static void schedule_text(const Habit *h, char *out, size_t cap) {
     }
 }
 
+static int quit_cmp(const void *a, const void *b) {
+    const Quit *qa = *(const Quit *const *)a;
+    const Quit *qb = *(const Quit *const *)b;
+    if (qa->sort_order != qb->sort_order) return qa->sort_order < qb->sort_order ? -1 : 1;
+    return qa->id < qb->id ? -1 : (qa->id > qb->id ? 1 : 0);
+}
+
 static int habit_cmp(const void *a, const void *b) {
     const Habit *ha = *(const Habit *const *)a;
     const Habit *hb = *(const Habit *const *)b;
@@ -405,6 +412,10 @@ static int habit_cmp(const void *a, const void *b) {
 
 static void on_toggle_done(Rid button, void *ud);
 static void on_note(Rid button, void *ud);
+static void on_today_move_up(Rid button, void *ud);
+static void on_today_move_down(Rid button, void *ud);
+static void on_quit_move_up(Rid button, void *ud);
+static void on_quit_move_down(Rid button, void *ud);
 static void on_toggle_skip(Rid button, void *ud);
 
 static void on_prev_day(Rid b, void *ud) {
@@ -428,6 +439,20 @@ static void on_today(Rid b, void *ud) {
     (void)ud;
     g_app.date = date_today();
     rebuild();
+}
+
+static const Habit **today_sorted(size_t *count) {
+    const Habit **items = xmalloc((g_app.db.nhabits + 1) * sizeof *items);
+    size_t n = 0;
+    for (size_t i = 0; i < g_app.db.nhabits; i++) {
+        Habit *h = &g_app.db.habits[i];
+        if (h->archived) continue;
+        if (!sched_show_in_today(h, g_app.date)) continue;
+        items[n++] = h;
+    }
+    qsort(items, n, sizeof *items, habit_cmp);
+    *count = n;
+    return items;
 }
 
 static Rid habit_row(const Habit *h) {
@@ -471,6 +496,14 @@ static Rid habit_row(const Habit *h) {
     int is_done = entry && entry->status == ENTRY_DONE;
     int is_skipped = entry && entry->status == ENTRY_SKIPPED;
 
+    Rid up = ui_button("↑", on_today_move_up, (void *)(intptr_t)h->id);
+    Rid down = ui_button("↓", on_today_move_down, (void *)(intptr_t)h->id);
+    Rwidget_set_size(up, 26.0f, 26.0f);
+    Rwidget_set_size(down, 26.0f, 26.0f);
+    Rwidget_set_tooltip(up, "Move up");
+    Rwidget_set_tooltip(down, "Move down");
+    add_center(col, up);
+    add_center(col, down);
     add_center(col, ui_button("Note", on_note, (void *)(intptr_t)h->id));
 
     add_center(col, pill_button(is_done ? "Done ✓" : "Done", 0.16f, 0.72f, 0.38f, is_done,
@@ -529,15 +562,8 @@ static void build_today(Rid root) {
         Rwidget_add_child(head, ui_flat_button("Today", on_today, NULL));
     Rwidget_add_child(root, head);
 
-    const Habit **items = xmalloc((g_app.db.nhabits + 1) * sizeof *items);
     size_t n = 0;
-    for (size_t i = 0; i < g_app.db.nhabits; i++) {
-        Habit *h = &g_app.db.habits[i];
-        if (h->archived) continue;
-        if (!sched_show_in_today(h, g_app.date)) continue;
-        items[n++] = h;
-    }
-    qsort(items, n, sizeof *items, habit_cmp);
+    const Habit **items = today_sorted(&n);
 
     Rid scroll = Rwidget_create(R_WIDGET_SCROLL_BOX);
     Rslot_set_fill(scroll, 1.0f);
@@ -596,9 +622,13 @@ static void build_quitting(Rid root) {
     Rwidget_add_child(scroll, list);
 
     int64_t now = now_epoch();
-    for (size_t i = 0; i < g_app.db.nquits; i++) {
-        Quit *q = &g_app.db.quits[i];
-        if (q->archived) continue;
+    Quit **order = xmalloc((g_app.db.nquits + 1) * sizeof *order);
+    size_t nq = 0;
+    for (size_t i = 0; i < g_app.db.nquits; i++)
+        if (!g_app.db.quits[i].archived) order[nq++] = &g_app.db.quits[i];
+    qsort(order, nq, sizeof *order, quit_cmp);
+    for (size_t k = 0; k < nq; k++) {
+        Quit *q = order[k];
 
         Rid content;
         Rid card = ui_card_acc(q->color, &content);
@@ -620,6 +650,14 @@ static void build_quitting(Rid root) {
         Rwidget_add_child(col, ui_muted(best_text, 12.0f));
         add_center(content, col);
         Rwidget_add_child(content, ui_spacer());
+        Rid up = ui_button("↑", on_quit_move_up, (void *)(intptr_t)q->id);
+        Rid down = ui_button("↓", on_quit_move_down, (void *)(intptr_t)q->id);
+        Rwidget_set_size(up, 26.0f, 26.0f);
+        Rwidget_set_size(down, 26.0f, 26.0f);
+        Rwidget_set_tooltip(up, "Move up");
+        Rwidget_set_tooltip(down, "Move down");
+        add_center(content, up);
+        add_center(content, down);
         add_center(content, ui_button("Relapsed", on_quit_reset, (void *)(intptr_t)q->id));
         add_center(content, ui_button("Edit", on_edit_quit, (void *)(intptr_t)q->id));
         add_center(content, ui_danger_button("Delete", on_delete_quit, (void *)(intptr_t)q->id));
@@ -631,6 +669,7 @@ static void build_quitting(Rid root) {
         }
         Rwidget_add_child(list, card);
     }
+    free(order);
     Rwidget_add_child(root, scroll);
 
     if (g_app.quit_timer) Rtimer_destroy(g_app.quit_timer);
@@ -958,6 +997,50 @@ static void on_move_down(Rid button, void *ud) {
     }
 }
 
+static void today_move(int64_t id, int delta) {
+    size_t n = 0;
+    const Habit **items = today_sorted(&n);
+    size_t pos = n;
+    for (size_t i = 0; i < n; i++)
+        if (items[i]->id == id) {
+            pos = i;
+            break;
+        }
+    long target = (long)pos + delta;
+    if (pos != n && target >= 0 && target < (long)n &&
+        db_habit_swap(&g_app.db, id, items[target]->id)) {
+        save_db();
+        rebuild();
+    }
+    free(items);
+}
+
+static void on_today_move_up(Rid button, void *ud) {
+    (void)button;
+    today_move((int64_t)(intptr_t)ud, -1);
+}
+
+static void on_today_move_down(Rid button, void *ud) {
+    (void)button;
+    today_move((int64_t)(intptr_t)ud, 1);
+}
+
+static void on_quit_move_up(Rid button, void *ud) {
+    (void)button;
+    if (db_quit_move(&g_app.db, (int64_t)(intptr_t)ud, -1)) {
+        save_db();
+        rebuild();
+    }
+}
+
+static void on_quit_move_down(Rid button, void *ud) {
+    (void)button;
+    if (db_quit_move(&g_app.db, (int64_t)(intptr_t)ud, 1)) {
+        save_db();
+        rebuild();
+    }
+}
+
 static void on_clear_stats(Rid button, void *ud) {
     (void)button;
     int64_t id = (int64_t)(intptr_t)ud;
@@ -1090,11 +1173,14 @@ static void build_habits(Rid root) {
     Rid list = ui_vbox(8.0f);
     Rwidget_add_child(scroll, list);
 
-    int any = 0;
-    for (size_t i = 0; i < g_app.db.nhabits; i++) {
-        const Habit *h = &g_app.db.habits[i];
-        if (h->archived) continue;
-        any = 1;
+    Habit **order = xmalloc((g_app.db.nhabits + 1) * sizeof *order);
+    size_t nh = 0;
+    for (size_t i = 0; i < g_app.db.nhabits; i++)
+        if (!g_app.db.habits[i].archived) order[nh++] = &g_app.db.habits[i];
+    qsort(order, nh, sizeof *order, habit_cmp);
+    int any = nh > 0;
+    for (size_t k = 0; k < nh; k++) {
+        const Habit *h = order[k];
         Rid content;
         Rid card = ui_card_acc(h->color, &content);
         add_center(content, ui_icon_badge(icon_glyph(h->icon), h->color));
@@ -1122,6 +1208,7 @@ static void build_habits(Rid root) {
         add_center(content, del);
         Rwidget_add_child(list, card);
     }
+    free(order);
     if (!any) Rwidget_add_child(list, ui_muted("No habits yet. Add the first one.", 14.0f));
 
     int archived_count = 0;

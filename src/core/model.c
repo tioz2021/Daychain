@@ -196,35 +196,113 @@ static int active_habit_cmp(const void *a, const void *b) {
     return ha->id < hb->id ? -1 : (ha->id > hb->id ? 1 : 0);
 }
 
-bool db_habit_move(DB *db, int64_t id, int delta) {
-    if (delta != -1 && delta != 1) return false;
+static Habit **active_habits_sorted(DB *db, size_t *count) {
     Habit **order = xmalloc((db->nhabits + 1) * sizeof *order);
     size_t n = 0;
     for (size_t i = 0; i < db->nhabits; i++)
         if (!db->habits[i].archived) order[n++] = &db->habits[i];
     qsort(order, n, sizeof *order, active_habit_cmp);
+    *count = n;
+    return order;
+}
 
+static void renumber_habits(Habit **order, size_t n) {
+    for (size_t i = 0; i < n; i++) order[i]->sort_order = (int)(i + 1) * 10;
+}
+
+bool db_habit_move(DB *db, int64_t id, int delta) {
+    if (delta != -1 && delta != 1) return false;
+    size_t n = 0;
+    Habit **order = active_habits_sorted(db, &n);
     size_t pos = n;
     for (size_t i = 0; i < n; i++)
         if (order[i]->id == id) {
             pos = i;
             break;
         }
-    if (pos == n) {
-        free(order);
-        return false;
-    }
     long target = (long)pos + delta;
-    if (target < 0 || target >= (long)n) {
+    if (pos == n || target < 0 || target >= (long)n) {
         free(order);
         return false;
     }
     /* renumber first so equal sort_order values cannot keep the items stuck */
-    for (size_t i = 0; i < n; i++) order[i]->sort_order = (int)(i + 1) * 10;
+    renumber_habits(order, n);
     int tmp = order[pos]->sort_order;
     order[pos]->sort_order = order[target]->sort_order;
     order[target]->sort_order = tmp;
     free(order);
+    return true;
+}
+
+bool db_habit_swap(DB *db, int64_t a, int64_t b) {
+    Habit *ha = db_habit_by_id(db, a);
+    Habit *hb = db_habit_by_id(db, b);
+    if (!ha || !hb || ha->archived || hb->archived) return false;
+    size_t n = 0;
+    Habit **order = active_habits_sorted(db, &n);
+    renumber_habits(order, n);
+    free(order);
+    int tmp = ha->sort_order;
+    ha->sort_order = hb->sort_order;
+    hb->sort_order = tmp;
+    return true;
+}
+
+static int active_quit_cmp(const void *a, const void *b) {
+    const Quit *qa = *(const Quit *const *)a;
+    const Quit *qb = *(const Quit *const *)b;
+    if (qa->sort_order != qb->sort_order) return qa->sort_order < qb->sort_order ? -1 : 1;
+    return qa->id < qb->id ? -1 : (qa->id > qb->id ? 1 : 0);
+}
+
+static Quit **active_quits_sorted(DB *db, size_t *count) {
+    Quit **order = xmalloc((db->nquits + 1) * sizeof *order);
+    size_t n = 0;
+    for (size_t i = 0; i < db->nquits; i++)
+        if (!db->quits[i].archived) order[n++] = &db->quits[i];
+    qsort(order, n, sizeof *order, active_quit_cmp);
+    *count = n;
+    return order;
+}
+
+static void renumber_quits(Quit **order, size_t n) {
+    for (size_t i = 0; i < n; i++) order[i]->sort_order = (int)(i + 1) * 10;
+}
+
+bool db_quit_move(DB *db, int64_t id, int delta) {
+    if (delta != -1 && delta != 1) return false;
+    size_t n = 0;
+    Quit **order = active_quits_sorted(db, &n);
+    size_t pos = n;
+    for (size_t i = 0; i < n; i++)
+        if (order[i]->id == id) {
+            pos = i;
+            break;
+        }
+    long target = (long)pos + delta;
+    if (pos == n || target < 0 || target >= (long)n) {
+        free(order);
+        return false;
+    }
+    renumber_quits(order, n);
+    int tmp = order[pos]->sort_order;
+    order[pos]->sort_order = order[target]->sort_order;
+    order[target]->sort_order = tmp;
+    free(order);
+    return true;
+}
+
+bool db_quit_swap(DB *db, int64_t a, int64_t b) {
+    Quit *qa = db_quit_by_id(db, a);
+    Quit *qb = db_quit_by_id(db, b);
+    if (!qa || !qb || qa->archived || qb->archived) return false;
+    size_t n = 0;
+    Quit **order = active_quits_sorted(db, &n);
+    renumber_quits(order, n);
+    free(order);
+    int tmp = qa->sort_order;
+    qa->sort_order = qb->sort_order;
+    qb->sort_order = tmp;
     return true;
 }
 

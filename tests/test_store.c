@@ -211,6 +211,36 @@ static void test_habit_move(void) {
     db_free(&db);
 }
 
+static void test_swaps(void) {
+    DB db;
+    db_init(&db);
+    Habit *a = test_add_habit(&db, "a", SCHED_DAILY, 0, 0, "2026-10-01");
+    Habit *b = test_add_habit(&db, "b", SCHED_DAILY, 0, 0, "2026-10-01");
+    Habit *c = test_add_habit(&db, "c", SCHED_DAILY, 0, 0, "2026-10-01");
+    CHECK(a->sort_order < b->sort_order && b->sort_order < c->sort_order);
+
+    CHECK(db_habit_swap(&db, a->id, c->id));
+    CHECK(c->sort_order < b->sort_order && b->sort_order < a->sort_order);
+    CHECK(!db_habit_swap(&db, a->id, 999));
+
+    Quit *q1 = db_quit_add(&db);
+    q1->name = xstrdup("one");
+    Quit *q2 = db_quit_add(&db);
+    q2->name = xstrdup("two");
+    Quit *q3 = db_quit_add(&db);
+    q3->name = xstrdup("three");
+    CHECK(q1->sort_order < q2->sort_order && q2->sort_order < q3->sort_order);
+
+    CHECK(db_quit_move(&db, q3->id, -1));
+    CHECK(q3->sort_order < q2->sort_order);
+    CHECK(!db_quit_move(&db, q1->id, -1));
+
+    CHECK(db_quit_swap(&db, q1->id, q3->id));
+    CHECK(q3->sort_order < q1->sort_order);
+    CHECK(!db_quit_swap(&db, q1->id, 999));
+    db_free(&db);
+}
+
 void test_store(void) {
     test_roundtrip();
     test_tolerates_corruption();
@@ -218,4 +248,5 @@ void test_store(void) {
     test_refuses_newer_schema();
     test_clear_entries();
     test_habit_move();
+    test_swaps();
 }

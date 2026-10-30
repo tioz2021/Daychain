@@ -103,6 +103,10 @@ size_t db_entries_remove_habit(DB *db, int64_t habit_id);
 /* Move an active habit one place up (delta -1) or down (+1) by renumbering
    sort_order. Returns false when it is already at the end. */
 bool db_habit_move(DB *db, int64_t id, int delta);
+/* Swap the places of two active habits (used when moving inside a filtered list). */
+bool db_habit_swap(DB *db, int64_t a, int64_t b);
+bool db_quit_move(DB *db, int64_t id, int delta);
+bool db_quit_swap(DB *db, int64_t a, int64_t b);
 
 /* Field validation; returns false and sets *code / *message. */
 bool habit_validate(Habit *h, const char **code, const char **message);
