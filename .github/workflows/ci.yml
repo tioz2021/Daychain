@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cc: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run the test suite
+        run: make CC=${{ matrix.cc }} test
+
+      - name: Check that the UI dictionaries agree
+        run: node tools/check_i18n.mjs
