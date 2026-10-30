@@ -270,13 +270,20 @@ static void add_center(Rid parent, Rid child) {
     Rwidget_add_child(parent, child);
 }
 
-static Rid ui_card(Rid *content) {
+/* A panel surface with a one-pixel outline, so cards read as separate blocks. */
+static void card_surface(Rid border) {
     float r, g, b, a;
     Rtheme_get_color(R_COLOR_PANEL, &r, &g, &b, &a);
-    Rid border = Rwidget_create(R_WIDGET_BORDER);
-    Rborder_set_padding(border, 14.0f, 12.0f, 14.0f, 12.0f);
     Rborder_set_background(border, r, g, b, 1.0f);
     Rborder_set_corner_radius(border, 0.0f, 0.0f, 0.0f, 0.0f);
+    Rtheme_get_color(R_COLOR_BORDER, &r, &g, &b, &a);
+    Rborder_set_outline(border, 1.0f, r, g, b, 1.0f);
+}
+
+static Rid ui_card(Rid *content) {
+    Rid border = Rwidget_create(R_WIDGET_BORDER);
+    Rborder_set_padding(border, 14.0f, 12.0f, 14.0f, 12.0f);
+    card_surface(border);
     Rid box = ui_hbox(12.0f);
     Rwidget_add_child(border, box);
     *content = box;
@@ -291,8 +298,7 @@ static Rid ui_card_acc(const char *hex, Rid *content) {
     Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
 
     Rid outer = Rwidget_create(R_WIDGET_BORDER);
-    Rborder_set_background(outer, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(outer, 0.0f, 0.0f, 0.0f, 0.0f);
+    card_surface(outer);
 
     Rid row = ui_hbox(0.0f);
     Rwidget_add_child(outer, row);
@@ -1281,8 +1287,7 @@ static Rid stat_card(const char *value, const char *label, float vr, float vg, f
     Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
     Rid border = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_padding(border, 16.0f, 12.0f, 16.0f, 12.0f);
-    Rborder_set_background(border, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(border, 0.0f, 0.0f, 0.0f, 0.0f);
+    card_surface(border);
     Rid col = ui_vbox(2.0f);
     Rwidget_add_child(border, col);
     Rid big = ui_label(value, 26.0f, 1);
@@ -1367,10 +1372,7 @@ static void build_stats(Rid root) {
     Rcustom_set_paint_callback(heat, paint_heatmap, &g_app);
     Rid heat_wrap = Rwidget_create(R_WIDGET_BORDER);
     Rborder_set_padding(heat_wrap, 16.0f, 16.0f, 16.0f, 16.0f);
-    float pr, pg, pb, pa;
-    Rtheme_get_color(R_COLOR_PANEL, &pr, &pg, &pb, &pa);
-    Rborder_set_background(heat_wrap, pr, pg, pb, 1.0f);
-    Rborder_set_corner_radius(heat_wrap, 0.0f, 0.0f, 0.0f, 0.0f);
+    card_surface(heat_wrap);
     Rid hm_row = ui_hbox(6.0f);
     Rid days_col = ui_vbox(3.0f);
     static const char *day_labels[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
